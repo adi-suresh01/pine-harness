@@ -45,9 +45,9 @@ function useTheme() {
     const forced = new URLSearchParams(location.search).get("theme");
     let theme = forced ?? (() => {
       try {
-        return localStorage.getItem("theme") ?? "light";
+        return localStorage.getItem("theme") ?? "dark";
       } catch {
-        return "light";
+        return "dark";
       }
     })();
     document.documentElement.dataset.theme = theme;
