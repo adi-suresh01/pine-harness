@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { posterDesktop, posterOpen, posterRelease } from "./api";
 import { LiveDesktop } from "./LiveDesktop";
+import { Prose } from "./Prose";
 
 interface Props {
   url: string;
@@ -59,12 +60,8 @@ export function PostDialog({ url, draft, onClose }: Props) {
       ) : (
       <aside className="post__side">
         <h2>Post this comment</h2>
-        <ol className="post__steps">
-          <li>Copy the comment.</li>
-          <li>Click the comment box on the desktop and paste.</li>
-          <li>Read it once more, then click Comment.</li>
-        </ol>
-        <p className="draft__text">{draft}</p>
+        <p className="post__how">Copy it, paste it into the comment box on the desktop, read it once more, then click Comment.</p>
+        <Prose text={draft} />
         <div className="post__actions">
           <button
             className="btn"

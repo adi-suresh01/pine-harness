@@ -411,15 +411,20 @@ a {
   border: 0;
   border-radius: 16px;
   padding: 0;
-  background: var(--paper);
+  /* a step lighter than the page, so it reads as a surface over it in both themes */
+  background: var(--screen);
   color: var(--ink);
+  box-shadow: 0 0 0 1px var(--hair);
 }
 .post[open] {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 360px;
 }
 .post::backdrop {
-  background: rgba(12, 21, 18, 0.55);
+  background: rgba(6, 11, 9, 0.78);
+}
+.post__how {
+  color: var(--soft);
 }
 .post__desktop {
   padding: 14px;
@@ -428,7 +433,7 @@ a {
 .post__desktop .desktop {
   border-radius: 10px;
   overflow: hidden;
-  background: var(--screen);
+  background: var(--paper);
 }
 .post__side {
   padding: 26px 24px;
