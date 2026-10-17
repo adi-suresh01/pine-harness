@@ -1,8 +1,11 @@
 # Demo script (about 3 minutes)
 
-Before going on: page open at http://localhost:3000 in Brave, full screen (Cmd+Ctrl+F), pine theme. Fleet warmed
-up in the last 30 minutes (`./scripts/with-env.sh bun run scripts/fleet.ts up 19`). Poster desktop still signed in.
-The afternoon run stays in the run picker as the backup.
+Before going on (20 minutes ahead):
+- `cd ~/Desktop/sm120-kit && harness up vllm-60172-stage` to warm the GPU (about 5 minutes, $2.49/hr, shuts itself
+  down at its 1.5-hour deadline; `harness down vllm-60172-stage` right after the demo).
+- `./scripts/with-env.sh bun run scripts/fleet.ts up 19` so no agent waits on a Computer start.
+- Page open at http://localhost:3000 in Brave, full screen (Cmd+Ctrl+F). Poster desktop still signed in.
+- The afternoon run stays in the run picker as the backup.
 
 ## 0:00 Hook, and start the run
 
@@ -40,18 +43,27 @@ Point at the dots.
 
 Click the #60172 dot.
 
-## 1:45 The GPU
+## 1:45 Fix it, live
 
-Click **Run it on a GPU now**. The card shows the quote from the RunPod catalog.
+Click **Ask a Pine agent to fix it**. The main screen switches to that agent's desktop.
 
-> Only the ones that need a GPU go to my repro harness. Here's the quote: one PRO 6000, two forty-nine an hour,
-> worst case a dollar thirty-seven, and the pod shuts itself down.
+> Now a fresh Pine agent gets the issue and the exact vLLM 0.31 source of the file in the traceback.
+> It isn't allowed to look at the open fix PRs. It has to work it out from the error and the code.
 
-Click **Approve**. The line under it goes to "Renting the GPU", then "Pod is up".
+About 2 minutes. The diff appears in the verdict column, and the server has already checked it applies to v0.31.0
+and touches only that file.
 
-> That's a real pod starting now. It takes about 7 minutes, so here's the same run from this afternoon:
-> one PRO 6000, 11 minutes, 47 cents. It reproduced the exact error, Required 102400, limit 101376,
-> and all three open fixes pass with GSM8K inside noise.
+Click **Test it on the warm GPU** (the pod was warmed 20 minutes before the demo).
+
+> This is a real RTX PRO 6000 that's been warm since before I came up. First the unpatched code with the reporter's
+> fp8 KV cache, then the agent's patch.
+
+About 2 minutes. Red, then green:
+
+> Unpatched: fails at boot, Required 102400, limit 101376. The agent's patch: serves.
+> This afternoon the same harness compared all three open fix PRs: all three pass, GSM8K inside noise, 47 cents.
+
+If the agent's patch is red: "the GPU says no, and that's the point: nothing ships on an agent's word."
 
 ## 2:15 Post it
 
