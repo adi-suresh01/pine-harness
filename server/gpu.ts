@@ -15,6 +15,8 @@ export interface GpuVariant {
   bootS?: number;
   fault?: string | null;
   gsm8k?: number | null;
+  /** for a shared-memory overflow: what the kernel asked for and what the GPU has, read from the server log */
+  smem?: { required: number; limit: number };
 }
 
 export interface GpuRun {
@@ -82,6 +84,13 @@ export async function gpuRun(issueKey: string): Promise<GpuRun> {
     else if (e.kind === "budget" && typeof e.spent_usd === "number") run.spentUsd = e.spent_usd;
   }
   run.variants = [...byName.values()];
+  // the verdict's fault is the first error line, often the generic engine failure; the cause is in the log
+  for (const v of run.variants) {
+    if (!v.verdict || v.verdict === "OK") continue;
+    const log = await readFile(join(KIT, "results", issueKey, v.name, "server.log"), "utf8").catch(() => "");
+    const m = log.match(/shared memory, Required: (\d+), Hardware limit: (\d+)/);
+    if (m) v.smem = { required: Number(m[1]), limit: Number(m[2]) };
+  }
   return run;
 }
 

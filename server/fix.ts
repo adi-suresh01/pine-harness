@@ -1,3 +1,4 @@
+import { readdirSync, readFileSync } from "node:fs";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
@@ -44,7 +45,26 @@ export interface FixStatus {
 }
 
 let current: FixStatus | undefined;
-export const currentFix = () => current;
+
+/** The fix in memory, or after a restart the newest one on disk, so the page and the GPU test pick up where they were. */
+export function currentFix(): FixStatus | undefined {
+  if (current) return current;
+  const dirs = readdirSync(RUNS_DIR).filter((d) => d.startsWith("fix-")).sort();
+  for (const d of dirs.reverse()) {
+    for (const issue of readdirSync(join(RUNS_DIR, d))) {
+      try {
+        const f = JSON.parse(readFileSync(join(RUNS_DIR, d, issue, "fix.json"), "utf8")) as FixStatus;
+        // a fix that was mid-flight when the server stopped will never finish
+        if (f.phase !== "done" && f.phase !== "failed") f.phase = "failed";
+        current = f;
+        return current;
+      } catch {
+        // not a fix folder
+      }
+    }
+  }
+  return undefined;
+}
 
 export function fixableIssues(): string[] {
   return Object.keys(TARGETS);
@@ -84,7 +104,8 @@ You have at most 5 minutes.
 }
 
 export async function startFix(issueKey: string): Promise<FixStatus> {
-  if (current && (current.phase === "starting" || current.phase === "running" || current.phase === "checking")) {
+  const now = currentFix();
+  if (now && (now.phase === "starting" || now.phase === "running" || now.phase === "checking")) {
     throw new Error("an agent is already writing a fix");
   }
   const t = TARGETS[issueKey];

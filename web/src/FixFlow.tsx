@@ -62,7 +62,7 @@ export function FixFlow({ issueKey, fix, stage }: Props) {
 
   return (
     <div className="fix">
-      {mine.summary && <p className="fix__summary">{mine.summary.replace(/^Created \[?agent-fix\.diff\]?(\([^)]*\))?\.?\s*/, "").split(/(?<=\.)\s/)[0]}</p>}
+      {mine.summary && <p className="fix__summary">{tidy(mine.summary)}</p>}
       {(!!mine.sameAs || !!mine.openedPrs?.length) && (
         <p className="fix__note">
           {mine.sameAs ? `Same change as open PR ${mine.sameAs}.` : ""}
@@ -77,7 +77,9 @@ export function FixFlow({ issueKey, fix, stage }: Props) {
               <b>{NAME[v.name]}</b>{" "}
               {v.verdict === "OK"
                 ? `serves${typeof v.gsm8k === "number" ? `, GSM8K ${v.gsm8k.toFixed(2)}` : ""}`
-                : `fails at boot${v.fault ? `: ${v.fault.slice(0, 60)}` : ", Required 102400 > 101376"}`}
+                : v.smem
+                  ? `fails at boot: needs ${v.smem.required.toLocaleString()} bytes of shared memory, the GPU has ${v.smem.limit.toLocaleString()}`
+                  : `fails at boot${v.fault ? `: ${v.fault.slice(0, 60)}` : ""}`}
             </li>
           ))}
         </ul>
@@ -106,6 +108,13 @@ export function FixFlow({ issueKey, fix, stage }: Props) {
       {error && <p className="fix__error">{error}</p>}
     </div>
   );
+}
+
+// the agent's result starts with a pointer to the file it wrote; the sentence after it says what the change does
+function tidy(summary: string): string {
+  const t = summary.replace(/^Created \[?agent-fix\.diff\]?(\([^)]*\))?[\s.;:,]*/i, "").trim();
+  const first = t.split(/(?<=\.)\s/)[0] ?? t;
+  return first.charAt(0).toUpperCase() + first.slice(1);
 }
 
 function Diff({ text }: { text: string }) {

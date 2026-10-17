@@ -30,3 +30,7 @@ vendor/
 
 # Pine Computer keys, bindings and session tokens
 state/
+
+# rendered video frames and recordings
+video/out/
+video/raw/
