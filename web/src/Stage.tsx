@@ -136,6 +136,12 @@ export function Stage({ issue, status, runId, live, gpu, stage, fix, fixable, fi
                 {fixBusy ? "Fixing" : "Fix issue"}
               </button>
             )}
+            {/* a GPU-repro issue without a kit: the fix exists as a capability, but nothing could test the patch yet */}
+            {!fixable && cat === "needs_repro" && (
+              <button className="btn btn--quiet btn--small" disabled title="Needs a GPU test kit in sm120-kit first. vllm#60172 has one.">
+                Fix issue
+              </button>
+            )}
             <button className="link" aria-expanded={open === "comment"} onClick={() => setOpen(open === "comment" ? null : "comment")}>
               {reviewed ? "My comment" : "Draft comment"}
             </button>
@@ -144,6 +150,7 @@ export function Stage({ issue, status, runId, live, gpu, stage, fix, fixable, fi
             </button>
             </p>
           {fixError && <p className="fix__error">{fixError}</p>}
+          {!fixable && cat === "needs_repro" && <p className="verdict__meta">Fixing this one needs a GPU test kit first. #60172 has one.</p>}
           {open === "comment" && <Prose text={draft} />}
           {open === "evidence" && (
             <ul className="evidence">
