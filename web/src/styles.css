@@ -456,6 +456,66 @@ body {
   max-width: 72ch;
 }
 
+/* left column: the agents, then what went on to a GPU */
+.left {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 14px;
+  min-height: 0;
+}
+.gpu {
+  background: var(--panel);
+  border: 1px solid var(--rule);
+  border-left: 8px solid var(--cat-needs_repro);
+  border-radius: 10px;
+  padding: 10px 14px;
+  display: grid;
+  gap: 8px;
+}
+.gpu__title {
+  margin: 0;
+  font-size: var(--step-1);
+  font-weight: 750;
+}
+.gpu__head {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  flex-wrap: wrap;
+}
+.gpu__head span {
+  color: var(--ink-soft);
+  font-size: var(--step--1);
+}
+.gpu__variants {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.gpu__variants li {
+  display: grid;
+  padding: 4px 10px;
+  border-radius: 6px;
+  background: var(--fog);
+  font-size: var(--step--1);
+  border-left: 4px solid var(--rule);
+}
+.gpu__variants li.is-ok {
+  border-left-color: var(--cat-already_fixed);
+}
+.gpu__variants li.is-fail {
+  border-left-color: var(--cat-needs_repro);
+}
+.gpu__name {
+  font-weight: 700;
+}
+.gpu__verdict {
+  color: var(--ink-soft);
+}
+
 /* post dialog */
 .post {
   width: min(1400px, 96vw);

@@ -1,5 +1,6 @@
 import { join, normalize } from "node:path";
 import { loadBacklog } from "./backlog";
+import { gpuRun } from "./gpu";
 import { subscribe } from "./bus";
 import { runningComputer } from "./pine/fleet";
 import { openForHuman, posterDelegation, releaseHuman } from "./poster";
@@ -9,6 +10,8 @@ import { RunBusyError, isLive, listRuns, runStatuses, startSwarm } from "./swarm
 import type { TriageStatus } from "./triage/run";
 
 const PORT = Number(process.env.PORT ?? 3000);
+// issues with an sm120-kit folder; GPU_ISSUES=a,b overrides
+const GPU_ISSUES = (process.env.GPU_ISSUES ?? "vllm-60172,vllm-60847").split(",").filter(Boolean);
 const WEB_DIST = join(ROOT, "web", "dist");
 
 const json = (body: unknown, status = 200) =>
@@ -87,6 +90,7 @@ Bun.serve({
   idleTimeout: 0,
   routes: {
     "/api/state": (req) => state(new URL(req.url).searchParams.get("run") ?? undefined).then((s) => json(s)),
+    "/api/gpu": async () => json(await Promise.all(GPU_ISSUES.map(gpuRun))),
     "/api/stream": () => sse(),
 
     "/api/runs": {

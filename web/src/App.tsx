@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { score } from "../../server/score";
 import { getState, startRun, type AppState, type TimelineEvent, type TriageStatus } from "./api";
 import { Focus } from "./Focus";
+import { GpuPanel } from "./GpuPanel";
 import { PostDialog } from "./PostDialog";
 import { SortBar } from "./SortBar";
 import { Tile } from "./Tile";
@@ -124,17 +125,20 @@ export function App() {
       <SortBar statuses={state.statuses} total={issues.length} />
 
       <main className="floor">
-        <div className="grid">
-          {issues.map((issue) => (
-            <Tile
-              key={issue.key}
-              issue={issue}
-              status={byKey.get(issue.key)}
-              runId={run?.runId}
-              selected={issue.key === focusKey}
-              onSelect={() => setSelected(issue.key)}
-            />
-          ))}
+        <div className="left">
+          <div className="grid">
+            {issues.map((issue) => (
+              <Tile
+                key={issue.key}
+                issue={issue}
+                status={byKey.get(issue.key)}
+                runId={run?.runId}
+                selected={issue.key === focusKey}
+                onSelect={() => setSelected(issue.key)}
+              />
+            ))}
+          </div>
+          <GpuPanel />
         </div>
         <div className="side">
           {focusIssue && run ? (
