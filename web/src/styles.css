@@ -279,6 +279,47 @@ a {
 .verdict__gpu {
   margin: 10px 0 0;
 }
+.gpu-card {
+  margin-top: 16px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: var(--screen);
+}
+.gpu-card p {
+  margin: 0;
+}
+.gpu-card__actions {
+  display: flex;
+  gap: 18px;
+  align-items: center;
+  margin-top: 12px !important;
+}
+.gpu-live {
+  margin-top: 14px;
+}
+.gpu-live p {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.gpu-live__variants {
+  flex-wrap: wrap;
+  gap: 4px 16px !important;
+  margin-top: 6px !important;
+  color: var(--soft);
+  font-size: var(--s-13);
+}
+.gpu-live__variants .is-ok {
+  color: var(--cat-already_fixed);
+}
+.gpu-live__variants .is-fail {
+  color: var(--cat-needs_repro);
+}
+.gpu-error {
+  color: var(--cat-needs_repro);
+  font-size: var(--s-13);
+}
 .verdict__post {
   margin-top: 26px;
 }

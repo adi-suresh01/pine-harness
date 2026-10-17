@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { GpuRun } from "../../server/gpu";
 import { frameUrl, loadTimeline, triageDesktop, type Issue, type TimelineEvent, type TriageStatus } from "./api";
+import { GpuApprove } from "./GpuApprove";
 import { LiveDesktop } from "./LiveDesktop";
 import { Prose } from "./Prose";
 import { checkedLine, firstSentence, gpuLine, headline } from "./verdictText";
@@ -11,11 +12,13 @@ interface Props {
   runId: string;
   live: TimelineEvent[];
   gpu: GpuRun | undefined;
+  /** the short kit a live demo may run for this issue, when there is one */
+  stage: GpuRun | undefined;
   reviewed: string | undefined;
   onPost: (draft: string) => void;
 }
 
-export function Stage({ issue, status, runId, live, gpu, reviewed, onPost }: Props) {
+export function Stage({ issue, status, runId, live, gpu, stage, reviewed, onPost }: Props) {
   const [history, setHistory] = useState<TimelineEvent[]>([]);
   const [open, setOpen] = useState<"comment" | "evidence" | null>(null);
 
@@ -86,6 +89,7 @@ export function Stage({ issue, status, runId, live, gpu, reviewed, onPost }: Pro
             {gt && gt.category === cat && " Matches my hand triage."}
           </p>
           {g && <p className="verdict__gpu">{g}.</p>}
+          {stage?.kitReady && <GpuApprove issueKey={issue.key} stage={stage} />}
           {draft && (
             <button className="btn verdict__post" onClick={() => onPost(draft)}>
               Post comment

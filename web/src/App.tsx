@@ -165,6 +165,7 @@ export function App() {
           runId={run.runId}
           live={liveEvents[`${run.runId}/${focus.key}`] ?? []}
           gpu={gpu.find((g) => g.issueKey === focus.key && g.kitReady)}
+          stage={gpu.find((g) => g.issueKey === `${focus.key}-stage`)}
           reviewed={state.reviewed?.[focus.key]}
           onPost={(draft) => setPosting({ url: focus.url, draft })}
         />

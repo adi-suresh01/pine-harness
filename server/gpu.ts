@@ -72,3 +72,86 @@ export async function gpuRun(issueKey: string): Promise<GpuRun> {
   run.variants = [...byName.values()];
   return run;
 }
+
+// ---- live runs from the page -------------------------------------------------------------------------------
+// The page may start a pod only for a stage kit, only at the price the person just saw, and never above
+// MAX_STAGE_USD. The click is the approval; it goes into the harness ledger as such.
+
+/** Triage issue -> the short sm120-kit folder a live demo may run. */
+export const STAGE_KITS: Record<string, string> = { "vllm-60172": "vllm-60172-stage" };
+const MAX_STAGE_USD = 3;
+
+export interface GpuQuote {
+  kit: string;
+  gpu: string;
+  cloud: string;
+  rateUsdHr: number;
+  worstCaseUsd: number;
+}
+
+const running = new Map<string, Bun.Subprocess>();
+
+// async on purpose: a quote reads the RunPod catalog, and a blocking spawn would stall every live stream meanwhile
+async function harness(args: string[]): Promise<{ code: number; out: string }> {
+  const p = Bun.spawn(["harness", ...args], { cwd: KIT, env: process.env, stdout: "pipe", stderr: "pipe" });
+  const [out, err] = await Promise.all([new Response(p.stdout).text(), new Response(p.stderr).text()]);
+  return { code: await p.exited, out: out + err };
+}
+
+function lastEvent(out: string, kind: string): Record<string, any> | undefined {
+  const lines = out.split("\n").filter((l) => l.includes(`"kind":"${kind}"`));
+  try {
+    return lines.length ? JSON.parse(lines[lines.length - 1]!) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+export async function gpuQuote(issueKey: string): Promise<GpuQuote> {
+  const kit = STAGE_KITS[issueKey];
+  if (!kit) throw new Error(`no stage kit for ${issueKey}`);
+  const q = lastEvent((await harness(["quote", kit])).out, "quote");
+  if (!q) throw new Error("harness quote returned nothing; is the RunPod key set?");
+  return { kit, gpu: q.gpu, cloud: q.cloud, rateUsdHr: q.rate_usd_hr, worstCaseUsd: q.worst_case_usd };
+}
+
+export function gpuLive(kit: string): boolean {
+  const p = running.get(kit);
+  return !!p && p.exitCode === null;
+}
+
+/** Records the approval in the kit's ledger and starts `harness run`, which terminates the pod on every exit. */
+let approving = false;
+
+export async function approveGpuRun(issueKey: string, shownWorstCaseUsd: number): Promise<GpuQuote> {
+  // one approval at a time: two quick clicks must not start two pods
+  if (approving) throw new Error("already starting a pod");
+  approving = true;
+  try {
+    return await approve(issueKey, shownWorstCaseUsd);
+  } finally {
+    approving = false;
+  }
+}
+
+async function approve(issueKey: string, shownWorstCaseUsd: number): Promise<GpuQuote> {
+  const q = await gpuQuote(issueKey);
+  if (gpuLive(q.kit)) throw new Error("a pod for this kit is already running");
+  // the price must still be the one on screen: stock and rates move
+  if (Math.abs(q.worstCaseUsd - shownWorstCaseUsd) > 0.01) throw new Error(`the quote changed to $${q.worstCaseUsd.toFixed(2)}; look again`);
+  if (q.worstCaseUsd > MAX_STAGE_USD) throw new Error(`worst case $${q.worstCaseUsd.toFixed(2)} is over the $${MAX_STAGE_USD} stage cap`);
+
+  const shown = lastEvent((await harness(["budget", "show", q.kit])).out, "budget");
+  const spent = typeof shown?.spent_usd === "number" ? shown.spent_usd : 0;
+  const budget = Math.ceil((spent + q.worstCaseUsd + 0.25) * 100) / 100;
+  const note =
+    `Approved by Aditya on the pine-harness page ${new Date().toISOString()}: 1x ${q.gpu} ${q.cloud} ` +
+    `$${q.rateUsdHr}/hr, worst case $${q.worstCaseUsd.toFixed(2)}`;
+  const set = await harness(["budget", "set", q.kit, budget.toFixed(2), "--note", note]);
+  if (set.code !== 0) throw new Error(`harness budget set failed: ${set.out.slice(-200)}`);
+
+  const log = Bun.file(join(KIT, "results", `${q.kit}.stage-run.log`));
+  const p = Bun.spawn(["harness", "run", q.kit], { cwd: KIT, env: process.env, stdout: log, stderr: log });
+  running.set(q.kit, p);
+  return q;
+}

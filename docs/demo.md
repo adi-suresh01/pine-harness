@@ -42,9 +42,16 @@ Click the #60172 dot.
 
 ## 1:45 The GPU
 
-> Only the ones that need a GPU go to my repro harness.
-> One PRO 6000, 11 minutes, 47 cents.
-> It reproduced the exact error, Required 102400, limit 101376, and all three open fixes pass with GSM8K inside noise.
+Click **Run it on a GPU now**. The card shows the quote from the RunPod catalog.
+
+> Only the ones that need a GPU go to my repro harness. Here's the quote: one PRO 6000, two forty-nine an hour,
+> worst case a dollar thirty-seven, and the pod shuts itself down.
+
+Click **Approve**. The line under it goes to "Renting the GPU", then "Pod is up".
+
+> That's a real pod starting now. It takes about 7 minutes, so here's the same run from this afternoon:
+> one PRO 6000, 11 minutes, 47 cents. It reproduced the exact error, Required 102400, limit 101376,
+> and all three open fixes pass with GSM8K inside noise.
 
 ## 2:15 Post it
 

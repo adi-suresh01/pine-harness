@@ -1,6 +1,6 @@
 import { join, normalize } from "node:path";
 import { loadBacklog } from "./backlog";
-import { gpuRun } from "./gpu";
+import { STAGE_KITS, approveGpuRun, gpuQuote, gpuRun } from "./gpu";
 import { subscribe } from "./bus";
 import { runningComputer } from "./pine/fleet";
 import { openForHuman, posterDelegation, releaseHuman } from "./poster";
@@ -13,7 +13,7 @@ const PORT = Number(process.env.PORT ?? 3000);
 // issues with an sm120-kit folder; GPU_ISSUES=a,b overrides
 // off by default: across three runs the learned skill was faster but leaned toward calling duplicates
 const DEFAULT_SKILLS = (process.env.DEFAULT_SKILLS ?? "").split(",").filter(Boolean);
-const GPU_ISSUES = (process.env.GPU_ISSUES ?? "vllm-60172,vllm-60847").split(",").filter(Boolean);
+const GPU_ISSUES = [...(process.env.GPU_ISSUES ?? "vllm-60172").split(",").filter(Boolean), ...Object.values(STAGE_KITS)];
 const WEB_DIST = join(ROOT, "web", "dist");
 
 const json = (body: unknown, status = 200) =>
@@ -104,6 +104,20 @@ Bun.serve({
   routes: {
     "/api/state": (req) => state(new URL(req.url).searchParams.get("run") ?? undefined).then((s) => json(s)),
     "/api/gpu": async () => json(await Promise.all(GPU_ISSUES.map(gpuRun))),
+    // what a live GPU run would cost, read fresh from the RunPod catalog; rents nothing
+    "/api/gpu/quote": {
+      POST: guard(async (req) => {
+        const b = await body<{ issueKey: string }>(req);
+        return json(await gpuQuote(b.issueKey));
+      }),
+    },
+    // the person's click on Approve, at the worst case they were shown
+    "/api/gpu/approve": {
+      POST: guard(async (req) => {
+        const b = await body<{ issueKey: string; worstCaseUsd: number }>(req);
+        return json(await approveGpuRun(b.issueKey, Number(b.worstCaseUsd)));
+      }),
+    },
     "/api/stream": () => sse(),
 
     "/api/runs": {
