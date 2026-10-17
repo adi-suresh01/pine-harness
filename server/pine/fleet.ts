@@ -134,7 +134,9 @@ async function resolveComputer(slot: number, log: (msg: string) => void): Promis
   }
 
   const saved = (await fleetEntries()).find((e) => e.slot === slot)!;
-  await saveEntry({ ...saved, binding: computer.binding().serialize() });
+  const binding = computer.binding().serialize();
+  // only write on a real change: a CLI script and the server can both hold this file open
+  if (saved.binding !== binding) await saveEntry({ ...saved, binding });
   cache.set(slot, { computer, checkedAt: Date.now() });
   return computer;
 }
