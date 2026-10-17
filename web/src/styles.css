@@ -412,8 +412,36 @@ a {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px 22px;
+  gap: 8px 16px;
   margin: 18px 0 0;
+}
+.plan {
+  margin-top: 16px;
+}
+.plan__head {
+  margin: 0;
+  font-weight: 650;
+}
+.plan__list {
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: h;
+  display: grid;
+  gap: 8px;
+  font-size: var(--s-13);
+  line-height: 1.5;
+}
+/* drawn numbers: the font's list markers come out as "1 ." */
+.plan__list li {
+  counter-increment: h;
+  display: grid;
+  grid-template-columns: 1.4em 1fr;
+}
+.plan__list li::before {
+  content: counter(h);
+  font-weight: 700;
+  color: var(--soft);
 }
 .prose {
   margin-top: 16px;

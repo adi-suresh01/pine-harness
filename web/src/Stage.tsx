@@ -24,7 +24,7 @@ interface Props {
 export function Stage({ issue, status, runId, live, gpu, stage, fix, fixable, fixEvents, reviewed, onPost }: Props) {
   const [history, setHistory] = useState<TimelineEvent[]>([]);
   const [loaded, setLoaded] = useState(false);
-  const [open, setOpen] = useState<"comment" | "evidence" | null>(null);
+  const [open, setOpen] = useState<"comment" | "evidence" | "plan" | null>(null);
   const [fixError, setFixError] = useState("");
 
   useEffect(() => {
@@ -136,6 +136,16 @@ export function Stage({ issue, status, runId, live, gpu, stage, fix, fixable, fi
                 {fixBusy ? "Fixing" : "Fix issue"}
               </button>
             )}
+            {/* the agent's repro plan is the input the harness turns into a kit; this shows it */}
+            {cat === "needs_repro" && status.verdict!.repro_plan && (
+              <button
+                className="btn btn--quiet btn--small"
+                aria-expanded={open === "plan"}
+                onClick={() => setOpen(open === "plan" ? null : "plan")}
+              >
+                Find root cause
+              </button>
+            )}
             {/* a GPU-repro issue without a kit: the fix exists as a capability, but nothing could test the patch yet */}
             {!fixable && cat === "needs_repro" && (
               <button className="btn btn--quiet btn--small" disabled title="Needs a GPU test kit in sm120-kit first. vllm#60172 has one.">
@@ -143,14 +153,31 @@ export function Stage({ issue, status, runId, live, gpu, stage, fix, fixable, fi
               </button>
             )}
             <button className="link" aria-expanded={open === "comment"} onClick={() => setOpen(open === "comment" ? null : "comment")}>
-              {reviewed ? "My comment" : "Draft comment"}
+              {reviewed ? "My comment" : "Comment"}
             </button>
             <button className="link" aria-expanded={open === "evidence"} onClick={() => setOpen(open === "evidence" ? null : "evidence")}>
               Evidence
             </button>
             </p>
           {fixError && <p className="fix__error">{fixError}</p>}
-          {!fixable && cat === "needs_repro" && <p className="verdict__meta">Fixing this one needs a GPU test kit first. #60172 has one.</p>}
+          {!fixable && cat === "needs_repro" && open !== "plan" && (
+            <p className="verdict__meta">Fixing this one needs a GPU test kit first. #60172 has one.</p>
+          )}
+          {open === "plan" && status.verdict!.repro_plan && (
+            <div className="plan">
+              <p className="plan__head">
+                {status.verdict!.repro_plan.gpu_count}x GPU, {status.verdict!.repro_plan.model}
+              </p>
+              <p className="verdict__meta">
+                The harness turns this into a kit and runs each experiment once I approve the price, as it did for #60172.
+              </p>
+              <ol className="plan__list">
+                {status.verdict!.repro_plan.hypotheses.map((h, i) => (
+                  <li key={i}>{h}</li>
+                ))}
+              </ol>
+            </div>
+          )}
           {open === "comment" && <Prose text={draft} />}
           {open === "evidence" && (
             <ul className="evidence">
