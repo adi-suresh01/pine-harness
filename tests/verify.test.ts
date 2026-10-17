@@ -67,3 +67,21 @@ test("duplicate needs a real other issue", async () => {
   });
   expect((await verifyVerdict(v, "vllm-project/vllm#48396", gh)).downgraded).toBe(false);
 });
+
+test("a rate limit leaves the verdict alone instead of downgrading it", async () => {
+  const limited = async () => ({ status: 403, body: "rate limited" });
+  const v = verdict({ evidence: [{ kind: "pr", ref: "#1", url: "https://github.com/vllm-project/vllm/pull/1", claim: "" }] });
+  const r = await verifyVerdict(v, "vllm-project/vllm#58910", limited);
+  expect(r.checks[0]?.status).toBe("unverified");
+  expect(r.downgraded).toBe(false);
+});
+
+test("an issue URL labelled as a comment does not back already_fixed", async () => {
+  const gh = fake({ "/repos/vllm-project/vllm/issues/58910": { user: { login: "r" }, state: "open", title: "crash" } });
+  const v = verdict({ evidence: [{ kind: "comment", ref: "self", url: "https://github.com/vllm-project/vllm/issues/58910", claim: "" }] });
+  expect((await verifyVerdict(v, "vllm-project/vllm#58910", gh)).categoryOut).toBe("needs_info");
+});
+
+test("parses API URLs the agents cite from their searches", () => {
+  expect(parseGithubUrl("https://api.github.com/repos/vllm-project/vllm/pulls/60173")).toEqual({ owner: "vllm-project", repo: "vllm", type: "pull", id: "60173" });
+});

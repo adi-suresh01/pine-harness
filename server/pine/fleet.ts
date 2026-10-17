@@ -12,9 +12,10 @@ import { join } from "node:path";
 import { STATE_DIR, readJson, writeJson } from "../store";
 
 const FLEET_FILE = join(STATE_DIR, "fleet.json");
-const SESSIONS_FILE = join(STATE_DIR, "sessions.json");
 // the demo leaves Computers idle while people watch, and watching doesn't count as use
 const WANTED_IDLE_S = 3600;
+// a cached handle is trusted this long before its runtime is read again
+const RECHECK_MS = 60_000;
 
 interface FleetEntry {
   slot: number;
@@ -22,11 +23,6 @@ interface FleetEntry {
   credentials: string;
   binding: string | null;
   createdAt: string;
-}
-interface SessionEntry {
-  computerId: string;
-  name: string;
-  token: string;
 }
 
 let client: Client | undefined;
@@ -40,21 +36,18 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 // One writer at a time: slots are created concurrently but share one file.
 let fleetLock: Promise<unknown> = Promise.resolve();
 function withFleet<T>(fn: (entries: FleetEntry[]) => Promise<T>): Promise<T> {
-  const next = fleetLock.then(async () => {
-    const entries = (await readJson<FleetEntry[]>(FLEET_FILE)) ?? [];
-    return fn(entries);
-  });
+  const next = fleetLock.then(async () => fn((await readJson<FleetEntry[]>(FLEET_FILE)) ?? []));
   fleetLock = next.catch(() => undefined);
   return next;
 }
-async function saveEntry(entry: FleetEntry): Promise<void> {
-  await withFleet(async (entries) => {
+function saveEntry(entry: FleetEntry): Promise<void> {
+  return withFleet(async (entries) => {
     const rest = entries.filter((e) => e.slot !== entry.slot);
     await writeJson(FLEET_FILE, [...rest, entry].sort((a, b) => a.slot - b.slot));
   });
 }
 
-export async function fleetEntries(): Promise<FleetEntry[]> {
+export function fleetEntries(): Promise<FleetEntry[]> {
   return withFleet(async (entries) => entries);
 }
 
@@ -66,29 +59,72 @@ async function idleTimeout(): Promise<number> {
   return idleSeconds;
 }
 
-const cache = new Map<number, Computer>();
+const cache = new Map<number, { computer: Computer; checkedAt: number }>();
+const inflight = new Map<number, Promise<Computer>>();
+
+/** Reads the runtime state; "gone" only when Pine confirms the record no longer exists. */
+async function runtimeState(computer: Computer): Promise<string> {
+  try {
+    return await computer.status();
+  } catch (err) {
+    if (err instanceof NotFoundError) return "gone";
+    throw err;
+  }
+}
 
 /** The running Computer for a slot: reconnects, restarts or creates it, and saves its keys first. */
-export async function ensureComputer(slot: number, log: (msg: string) => void = () => {}): Promise<Computer> {
-  const cached = cache.get(slot);
-  if (cached) return cached;
+export function ensureComputer(slot: number, log: (msg: string) => void = () => {}): Promise<Computer> {
+  // two triages, or a triage and a page request, must never create two Computers for one slot
+  let p = inflight.get(slot);
+  if (!p) {
+    p = resolveComputer(slot, log).finally(() => inflight.delete(slot));
+    inflight.set(slot, p);
+  }
+  return p;
+}
+
+async function resolveComputer(slot: number, log: (msg: string) => void): Promise<Computer> {
+  const hit = cache.get(slot);
+  if (hit && Date.now() - hit.checkedAt < RECHECK_MS) return hit.computer;
+  if (hit) {
+    const state = await runtimeState(hit.computer).catch(() => "unknown");
+    if (state === "running") {
+      hit.checkedAt = Date.now();
+      return hit.computer;
+    }
+    log(`slot ${slot}: cached runtime is ${state}`);
+    cache.delete(slot);
+  }
 
   const entry = (await fleetEntries()).find((e) => e.slot === slot);
   const opts = { idleTimeoutSeconds: await idleTimeout(), location: { country: "US" } as const };
   let computer: Computer;
 
   if (entry?.binding) {
-    computer = pine().reconnectComputer(Credentials.parse(entry.credentials), Binding.parse(entry.binding));
-    const state = await computer.status().catch((err) => (err instanceof NotFoundError ? "gone" : "unknown"));
-    if (state !== "running") {
+    const credentials = Credentials.parse(entry.credentials);
+    computer = pine().reconnectComputer(credentials, Binding.parse(entry.binding));
+    const state = await runtimeState(computer);
+    if (state === "running") {
+      // keep it
+    } else if (state === "paused") {
+      log(`slot ${slot}: resuming`);
+      await computer.resume();
+    } else if (state === "failed" || state === "unavailable") {
+      log(`slot ${slot}: runtime ${state}, recovering from saved state`);
+      computer = await withCreateRetry(() => pine().recoverComputer(credentials, opts), log);
+    } else if (state === "gone" || state === "terminated" || state === "stopped") {
       log(`slot ${slot}: runtime ${state}, starting it again`);
-      computer = await withCreateRetry(() => pine().startComputer(Credentials.parse(entry.credentials), opts), log);
+      computer = await withCreateRetry(() => pine().startComputer(credentials, opts), log);
+    } else {
+      // pending, stopping, saving...: an operation is under way, so don't allocate a second runtime
+      throw new Error(`slot ${slot}: runtime is ${state}; try again in a minute`);
     }
   } else if (entry) {
     // keys saved but the create never finished: start the same identity rather than leak a new one
-    log(`slot ${slot}: resuming an unfinished create`);
-    computer = await withCreateRetry(() => pine().startComputer(Credentials.parse(entry.credentials), opts), log).catch(
-      () => withCreateRetry(() => pine().createComputer({ credentials: Credentials.parse(entry.credentials), ...opts }), log),
+    log(`slot ${slot}: finishing an interrupted create`);
+    const credentials = Credentials.parse(entry.credentials);
+    computer = await withCreateRetry(() => pine().startComputer(credentials, opts), log).catch(() =>
+      withCreateRetry(() => pine().createComputer({ credentials, ...opts }), log),
     );
   } else {
     const credentials = await Credentials.generate();
@@ -99,8 +135,23 @@ export async function ensureComputer(slot: number, log: (msg: string) => void = 
 
   const saved = (await fleetEntries()).find((e) => e.slot === slot)!;
   await saveEntry({ ...saved, binding: computer.binding().serialize() });
-  cache.set(slot, computer);
+  cache.set(slot, { computer, checkedAt: Date.now() });
   return computer;
+}
+
+/** The slot's Computer only if it is already running; never starts or creates one. */
+export async function runningComputer(slot: number): Promise<Computer | undefined> {
+  const hit = cache.get(slot);
+  if (hit) return hit.computer;
+  const entry = (await fleetEntries()).find((e) => e.slot === slot);
+  if (!entry?.binding) return undefined;
+  const computer = pine().reconnectComputer(Credentials.parse(entry.credentials), Binding.parse(entry.binding));
+  return (await runtimeState(computer).catch(() => "unknown")) === "running" ? computer : undefined;
+}
+
+/** Forgets a cached handle after a call says its runtime is gone, so the next use reconnects or restarts. */
+export function forget(slot: number): void {
+  cache.delete(slot);
 }
 
 async function withCreateRetry<T>(fn: () => Promise<T>, log: (msg: string) => void): Promise<T> {
@@ -115,7 +166,7 @@ async function withCreateRetry<T>(fn: () => Promise<T>, log: (msg: string) => vo
         continue;
       }
       if (err instanceof CapacityExceededError) {
-        throw new Error("project is at its concurrent Computer limit; stop some with `bun run fleet down`", { cause: err });
+        throw new Error("the project is at its concurrent Computer limit; stop some with `bun run scripts/fleet.ts down`", { cause: err });
       }
       throw err;
     }
@@ -128,8 +179,12 @@ export async function fleetUp(n: number, log: (msg: string) => void = console.lo
   const workers = Array.from({ length: Math.min(4, n) }, async () => {
     for (let slot = slots.shift(); slot !== undefined; slot = slots.shift()) {
       const t0 = Date.now();
-      const c = await ensureComputer(slot, log);
-      log(`slot ${slot}: ready ${c.id} in ${((Date.now() - t0) / 1000).toFixed(0)}s`);
+      try {
+        const c = await ensureComputer(slot, log);
+        log(`slot ${slot}: ready ${c.id} in ${((Date.now() - t0) / 1000).toFixed(0)}s`);
+      } catch (err) {
+        log(`slot ${slot}: failed: ${(err as Error).message}`);
+      }
     }
   });
   await Promise.all(workers);
@@ -149,26 +204,11 @@ export async function fleetDown(log: (msg: string) => void = console.log): Promi
   }
 }
 
-// Session tokens come back only once, at create, so they live in state/ next to the fleet keys.
-async function saveSession(key: string, s: SessionEntry): Promise<void> {
-  const all = (await readJson<Record<string, SessionEntry>>(SESSIONS_FILE)) ?? {};
-  all[key] = s;
-  await writeJson(SESSIONS_FILE, all);
-}
-
 /** A fresh browser session for one triage, so the agent starts with no memory of earlier runs. */
 export async function freshSession(computer: Computer, runId: string, issueKey: string): Promise<Session> {
   const name = `t-${runId}`;
   for (const s of await computer.sessions()) {
     if (s.name !== name && s.name.startsWith("t-")) await computer.destroySession(s.name).catch(() => undefined);
   }
-  const session = await computer.createSession({ name, label: issueKey, browser: true });
-  await saveSession(`${runId}/${issueKey}`, { computerId: computer.id, name: session.name, token: session.token });
-  return session;
-}
-
-export async function adoptSession(runId: string, issueKey: string, computer: Computer): Promise<Session | undefined> {
-  const all = (await readJson<Record<string, SessionEntry>>(SESSIONS_FILE)) ?? {};
-  const s = all[`${runId}/${issueKey}`];
-  return s ? computer.adoptSession(s.name, s.token) : undefined;
+  return computer.createSession({ name, label: issueKey, browser: true });
 }

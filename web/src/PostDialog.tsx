@@ -19,10 +19,14 @@ export function PostDialog({ url, draft, onClose }: Props) {
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    ref.current?.showModal();
+    let cancelled = false;
+    if (!ref.current?.open) ref.current?.showModal();
     posterOpen(url)
-      .then(() => setReady(true))
-      .catch((err: Error) => setError(err.message));
+      .then(() => !cancelled && setReady(true))
+      .catch((err: Error) => !cancelled && setError(err.message));
+    return () => {
+      cancelled = true;
+    };
   }, [url]);
 
   const delegate = useCallback(() => posterDesktop(), []);

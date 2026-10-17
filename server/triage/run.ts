@@ -1,8 +1,8 @@
-import type { AgentEvent, AgentTurn, Session } from "@pinesandbox/computer";
+import { RuntimeGoneError, type AgentEvent, type AgentTurn, type Session } from "@pinesandbox/computer";
 import { join } from "node:path";
 import type { Issue } from "../backlog";
 import { publish } from "../bus";
-import { ensureComputer, freshSession } from "../pine/fleet";
+import { ensureComputer, forget, freshSession } from "../pine/fleet";
 import { appendJsonl, runDir, writeBytes, writeJson } from "../store";
 import { parseVerdict, type Verdict } from "../verdict";
 import { verifyVerdict, type Verified } from "../verify";
@@ -52,12 +52,19 @@ const TURN_DEADLINE_MS = MAX_WALL_MS + 4 * 60_000;
 export async function runTriage(runId: string, issue: Issue, slot: number, opts: TriageOptions = {}): Promise<TriageStatus> {
   const dir = runDir(runId, issue.key);
   const status: TriageStatus = { runId, issueKey: issue.key, slot, phase: "starting", startedAt: new Date().toISOString() };
-  const update = async (patch: Partial<TriageStatus>) => {
+  // writes queue up: a frame landing while the verdict is saved must not interleave with it
+  let writes: Promise<void> = Promise.resolve();
+  const update = (patch: Partial<TriageStatus>): Promise<void> => {
     Object.assign(status, patch);
-    await writeJson(join(dir, "status.json"), status);
-    publish("status", status);
+    const snapshot = { ...status };
+    writes = writes
+      .then(() => writeJson(join(dir, "status.json"), snapshot))
+      .then(() => publish("status", snapshot))
+      .catch((err) => console.warn(`[${issue.key}] status write failed: ${(err as Error).message}`));
+    return writes;
   };
   await update({});
+  const stream = new AbortController();
 
   try {
     const computer = await ensureComputer(slot);
@@ -74,10 +81,9 @@ export async function runTriage(runId: string, issue: Issue, slot: number, opts:
     });
     await update({ phase: "running", turnId: turn.turnId, turnState: turn.state });
 
-    const stream = new AbortController();
-    const streaming = followEvents(session, turn.turnId, { runId, issueKey: issue.key, dir }, stream.signal, async (frameFile) => {
-      await update({ lastFrame: frameFile });
-    }).catch((err) => console.warn(`[${issue.key}] event stream ended: ${(err as Error).message}`));
+    const streaming = followEvents(session, { runId, issueKey: issue.key, dir }, stream.signal, (frameFile) =>
+      update({ lastFrame: frameFile }),
+    ).catch((err) => console.warn(`[${issue.key}] event stream ended: ${(err as Error).message}`));
 
     const ended = await waitForTurn(session, turn);
     // the result event usually lands a beat after the turn ends; give the stream a moment to drain
@@ -103,13 +109,30 @@ export async function runTriage(runId: string, issue: Issue, slot: number, opts:
     await writeJson(join(dir, "verified.json"), verified);
     return await finish(update, { phase: "done", verdict: parsed.verdict, verified });
   } catch (err) {
+    if (err instanceof RuntimeGoneError) forget(slot);
     return await finish(update, { phase: "failed", error: (err as Error).message });
+  } finally {
+    stream.abort();
   }
 }
 
+// never rejects: one triage failing must not take the other 19 or the server down with it
 async function finish(update: (p: Partial<TriageStatus>) => Promise<void>, patch: Partial<TriageStatus>) {
-  await update({ ...patch, endedAt: new Date().toISOString() });
+  await update({ ...patch, endedAt: new Date().toISOString() }).catch(() => undefined);
   return patch as TriageStatus;
+}
+
+// a long-poll that drops or gets a 5xx says nothing about the turn; read it again until the deadline
+async function waitOnce(session: Session, turnId: string, timeoutMs: number, deadline: number): Promise<AgentTurn> {
+  for (;;) {
+    try {
+      return await session.agent.wait(turnId, { timeoutMs });
+    } catch (err) {
+      const status = (err as { status?: number }).status;
+      if ((status && status < 500) || Date.now() > deadline) throw err;
+      await sleep(2000);
+    }
+  }
 }
 
 async function waitForTurn(session: Session, first: AgentTurn): Promise<AgentTurn> {
@@ -117,10 +140,10 @@ async function waitForTurn(session: Session, first: AgentTurn): Promise<AgentTur
   let turn = first;
   let answers = 0;
   while (Date.now() < deadline) {
-    turn = await session.agent.wait(turn.turnId, { timeoutMs: 30_000 });
+    turn = await waitOnce(session, turn.turnId, 30_000, deadline);
     if (turn.state === "running" || turn.state === "canceling") continue;
     if (turn.state === "answered") {
-      turn = await session.agent.wait(turn.nextTurnId, { timeoutMs: 0 });
+      turn = await waitOnce(session, turn.nextTurnId, 0, deadline);
       continue;
     }
     if (turn.state === "needs_input" && answers < 2) {
@@ -146,9 +169,9 @@ async function readVerdictText(session: Session, turnId: string): Promise<string
   return bytes ? new TextDecoder().decode(bytes) : undefined;
 }
 
+// The session is fresh, so every event in it belongs to this triage, including the turn an answer opens.
 async function followEvents(
   session: Session,
-  turnId: string,
   where: { runId: string; issueKey: string; dir: string },
   signal: AbortSignal,
   onFrame: (file: string) => Promise<void>,
@@ -156,12 +179,12 @@ async function followEvents(
   const { dir, runId, issueKey } = where;
   const { taskId } = await session.agent.status();
   for await (const ev of session.agent.events({ expectedTaskId: taskId, signal })) {
-    if (ev.turnId && ev.turnId !== turnId) continue;
     const t = await toTimeline(ev, dir);
     await appendJsonl(join(dir, "events.jsonl"), t);
     publish("event", { runId, issueKey, event: t });
     if (t.frame) await onFrame(t.frame.file);
-    if (t.result) return;
+    // a question ends a turn but not the triage: the answer opens the next one
+    if (t.result && t.result.terminalReason !== "needs_input") return;
   }
 }
 

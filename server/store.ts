@@ -14,15 +14,18 @@ export async function readJson<T>(path: string): Promise<T | undefined> {
   try {
     return JSON.parse(await readFile(path, "utf8")) as T;
   } catch (err) {
-    if ((err as NodeJS.ErrnoException).code === "ENOENT") return undefined;
+    const code = (err as NodeJS.ErrnoException).code;
+    // ENOTDIR: a stray file like .DS_Store where a run folder should be
+    if (code === "ENOENT" || code === "ENOTDIR") return undefined;
     throw err;
   }
 }
 
-// write-then-rename so a crash mid-write never leaves half a fleet file, which holds the only copy of the keys
+// write-then-rename so a crash mid-write never leaves half a fleet file, which holds the only copy of the keys.
+// The temp name is unique per write: two writes to one status.json can overlap.
 export async function writeJson(path: string, value: unknown): Promise<void> {
   await mkdir(dirname(path), { recursive: true });
-  const tmp = `${path}.${process.pid}.tmp`;
+  const tmp = `${path}.${process.pid}.${crypto.randomUUID()}.tmp`;
   await writeFile(tmp, JSON.stringify(value, null, 2));
   await rename(tmp, path);
 }

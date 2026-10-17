@@ -48,6 +48,8 @@ export function App() {
       setLiveEvents((prev) => ({ ...prev, [`${r}/${issueKey}`]: [...(prev[`${r}/${issueKey}`] ?? []).slice(-200), event] }));
     });
     es.addEventListener("run", () => void refresh());
+    // the stream reconnects on its own; anything sent while it was down only shows up in a fresh read
+    es.addEventListener("hello", () => void refresh());
     return () => es.close();
   }, [refresh]);
 
@@ -63,6 +65,8 @@ export function App() {
   const focusIssue = issues.find((i) => i.key === focusKey);
 
   if (!state) return <main className="boot">{error || "Loading the backlog"}</main>;
+  // any run, not just the one on screen: a second run would take over the first one's Computers
+  const anyLive = state.runs.some((r) => r.live);
 
   return (
     <div className="app">
@@ -97,14 +101,14 @@ export function App() {
           )}
           <button
             className="btn"
-            disabled={!!run?.live}
+            disabled={anyLive}
             onClick={() =>
               startRun()
                 .then((m) => setRunId(m.runId))
                 .catch((e: Error) => setError(e.message))
             }
           >
-            {run?.live ? "Triaging" : `Triage all ${state.backlog.length}`}
+            {anyLive ? "Triaging" : `Triage all ${state.backlog.length}`}
           </button>
           <button className="link" onClick={() => setPosting({ url: "https://github.com/login", draft: "" })}>
             My GitHub desktop

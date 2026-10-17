@@ -31,8 +31,11 @@ async function post<T>(path: string, body: unknown): Promise<T> {
   return data as T;
 }
 
-export const getState = (runId?: string) =>
-  fetch(`/api/state${runId ? `?run=${runId}` : ""}`).then((r) => r.json() as Promise<AppState>);
+export async function getState(runId?: string): Promise<AppState> {
+  const res = await fetch(`/api/state${runId ? `?run=${runId}` : ""}`);
+  if (!res.ok) throw new Error(`The server could not load the backlog (${res.status}).`);
+  return res.json();
+}
 export const startRun = (issues?: string[]) => post<RunMeta>("/api/runs", { issues });
 export const triageDesktop = (runId: string, issueKey: string) => post<Delegation>("/api/desktop", { runId, issueKey });
 export const posterDesktop = () => post<Delegation>("/api/poster/desktop", {});
@@ -49,10 +52,16 @@ export type Delegation = {
 export async function loadTimeline(runId: string, issueKey: string): Promise<TimelineEvent[]> {
   const res = await fetch(`/runs/${runId}/${issueKey}/events.jsonl`);
   if (!res.ok) return [];
-  return (await res.text())
-    .split("\n")
-    .filter(Boolean)
-    .map((l) => JSON.parse(l) as TimelineEvent);
+  const events: TimelineEvent[] = [];
+  for (const line of (await res.text()).split("\n")) {
+    // the last line can be half-written while the agent is still going
+    try {
+      if (line) events.push(JSON.parse(line) as TimelineEvent);
+    } catch {
+      break;
+    }
+  }
+  return events;
 }
 
 export const frameUrl = (runId: string, issueKey: string, file: string) => `/runs/${runId}/${issueKey}/${file}`;

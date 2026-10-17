@@ -15,8 +15,12 @@ export function Focus({ issue, status, runId, live }: Props) {
   const [watchLive, setWatchLive] = useState(true);
 
   useEffect(() => {
+    let cancelled = false;
     setHistory([]);
-    loadTimeline(runId, issue.key).then(setHistory);
+    loadTimeline(runId, issue.key).then((h) => !cancelled && setHistory(h));
+    return () => {
+      cancelled = true;
+    };
   }, [runId, issue.key]);
 
   const delegate = useCallback(() => triageDesktop(runId, issue.key), [runId, issue.key]);
@@ -36,7 +40,7 @@ export function Focus({ issue, status, runId, live }: Props) {
         )}
       </header>
       {running && watchLive ? (
-        <LiveDesktop delegate={delegate} desktopKey={`${runId}/${issue.key}`} />
+        <LiveDesktop key={`${runId}/${issue.key}`} delegate={delegate} desktopKey={`${runId}/${issue.key}`} />
       ) : lastFrame ? (
         <img className="desktop desktop--frame" src={frameUrl(runId, issue.key, lastFrame)} alt="Last screenshot from the agent's desktop" />
       ) : (

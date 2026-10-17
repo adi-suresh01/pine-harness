@@ -1,11 +1,11 @@
 import { join, normalize } from "node:path";
 import { loadBacklog } from "./backlog";
 import { subscribe } from "./bus";
-import { ensureComputer } from "./pine/fleet";
+import { runningComputer } from "./pine/fleet";
 import { openForHuman, posterDelegation, releaseHuman } from "./poster";
 import { score } from "./score";
 import { ROOT, RUNS_DIR, readJson, runDir } from "./store";
-import { isLive, listRuns, runStatuses, startSwarm } from "./swarm";
+import { RunBusyError, isLive, listRuns, runStatuses, startSwarm } from "./swarm";
 import type { TriageStatus } from "./triage/run";
 
 const PORT = Number(process.env.PORT ?? 3000);
@@ -17,6 +17,19 @@ const json = (body: unknown, status = 200) =>
 async function body<T>(req: Request): Promise<T> {
   return (await req.json().catch(() => ({}))) as T;
 }
+
+// Only this machine's own page may call the API. A JSON content type forces a CORS preflight, so a page on
+// another origin can't fire these POSTs blind, and the Origin check covers browsers that send one anyway.
+function allowed(req: Request): boolean {
+  if (req.method === "GET") return true;
+  if (!(req.headers.get("content-type") ?? "").startsWith("application/json")) return false;
+  const origin = req.headers.get("origin");
+  return !origin || /^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(origin);
+}
+const guard =
+  (fn: (req: Request) => Promise<Response>) =>
+  (req: Request): Promise<Response> | Response =>
+    allowed(req) ? fn(req) : json({ error: "forbidden" }, 403);
 
 // only files under a root, so a crafted path can't read state/ with the keys in it
 function safeFile(root: string, rel: string): string | undefined {
@@ -68,6 +81,8 @@ async function statusFor(runId: string, issueKey: string): Promise<TriageStatus 
 }
 
 Bun.serve({
+  // loopback only: the poster desktop is signed in to my GitHub, and the venue Wi-Fi is shared
+  hostname: "127.0.0.1",
   port: PORT,
   idleTimeout: 0,
   routes: {
@@ -75,37 +90,44 @@ Bun.serve({
     "/api/stream": () => sse(),
 
     "/api/runs": {
-      POST: async (req) => {
+      POST: guard(async (req) => {
         const b = await body<{ issues?: string[]; skills?: string[] }>(req);
-        return json(await startSwarm(b.issues, { skills: b.skills }));
-      },
+        try {
+          return json(await startSwarm(b.issues, { skills: b.skills }));
+        } catch (err) {
+          if (err instanceof RunBusyError) return json({ error: "a run is already going; wait for it to finish" }, 409);
+          throw err;
+        }
+      }),
     },
 
     // a fresh desktop token for one triage tile; the browser gets nothing else
     "/api/desktop": {
-      POST: async (req) => {
+      POST: guard(async (req) => {
         const b = await body<{ runId: string; issueKey: string }>(req);
         const s = await statusFor(b.runId, b.issueKey);
-        if (!s?.sessionName) return json({ error: "no session for that issue yet" }, 404);
-        const computer = await ensureComputer(s.slot);
+        if (!s?.sessionName || s.phase !== "running") return json({ error: "that agent is not running" }, 404);
+        // reconnect only: viewing a tile must never start or create a Computer
+        const computer = await runningComputer(s.slot);
+        if (!computer) return json({ error: "that Computer is not running" }, 404);
         return json((await computer.delegateDesktop(s.sessionName, { create: false })).toJSON());
-      },
+      }),
     },
 
-    "/api/poster/desktop": { POST: async () => json(await posterDelegation()) },
+    "/api/poster/desktop": { POST: guard(async () => json(await posterDelegation())) },
     // opens the page on the signed-in poster desktop and hands control to Aditya
     "/api/poster/open": {
-      POST: async (req) => {
+      POST: guard(async (req) => {
         const b = await body<{ url: string }>(req);
         if (!/^https:\/\/github\.com\//.test(b.url ?? "")) return json({ error: "github.com URLs only" }, 400);
         return json(await openForHuman(b.url));
-      },
+      }),
     },
     "/api/poster/release": {
-      POST: async (req) => {
+      POST: guard(async (req) => {
         const b = await body<{ postedUrl?: string }>(req);
         return json(await releaseHuman(b.postedUrl));
-      },
+      }),
     },
   },
 
@@ -114,7 +136,9 @@ Bun.serve({
     if (url.pathname.startsWith("/runs/")) {
       const p = safeFile(RUNS_DIR, decodeURIComponent(url.pathname.slice("/runs/".length)));
       const f = p && Bun.file(p);
-      return f && (await f.exists()) ? new Response(f, { headers: { "Cache-Control": "max-age=3600" } }) : new Response("not found", { status: 404 });
+      // frames never change once written; logs and statuses change every few seconds
+      const cache = p?.endsWith(".webp") ? "max-age=3600" : "no-store";
+      return f && (await f.exists()) ? new Response(f, { headers: { "Cache-Control": cache } }) : new Response("not found", { status: 404 });
     }
     const p = safeFile(WEB_DIST, url.pathname === "/" ? "index.html" : url.pathname.slice(1));
     const f = p ? Bun.file(p) : undefined;
