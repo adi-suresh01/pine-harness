@@ -1,4 +1,4 @@
-import { readdir } from "node:fs/promises";
+import { readdir, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { loadBacklog, type Issue } from "./backlog";
 import { publish } from "./bus";
@@ -83,11 +83,19 @@ export async function listRuns(): Promise<RunMeta[]> {
 }
 
 const UNFINISHED = new Set(["queued", "starting", "running", "verifying"]);
+// a working triage rewrites its status with every screenshot; ten quiet minutes means nobody is driving it
+const STALE_MS = 10 * 60_000;
 
 export async function runStatuses(meta: RunMeta): Promise<TriageStatus[]> {
-  const all = await Promise.all(meta.issueKeys.map((k) => readJson<TriageStatus>(join(runDir(meta.runId, k), "status.json"))));
-  const statuses = all.filter((s): s is TriageStatus => !!s);
-  if (isLive(meta.runId)) return statuses;
-  // a run this process isn't driving can't still be working: the server restarted under it
-  return statuses.map((s) => (UNFINISHED.has(s.phase) ? { ...s, phase: "failed", error: s.error ?? "stopped when the server restarted" } : s));
+  const all = await Promise.all(
+    meta.issueKeys.map(async (k) => {
+      const path = join(runDir(meta.runId, k), "status.json");
+      const s = await readJson<TriageStatus>(path);
+      if (!s || isLive(meta.runId) || !UNFINISHED.has(s.phase)) return s;
+      // another process (the CLI) may be driving it, so judge by age, not by who started it
+      const age = Date.now() - (await stat(path)).mtimeMs;
+      return age > STALE_MS ? { ...s, phase: "failed" as const, error: s.error ?? "stopped: nothing updated it for 10 minutes" } : s;
+    }),
+  );
+  return all.filter((s): s is TriageStatus => !!s);
 }
