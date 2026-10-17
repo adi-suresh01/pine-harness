@@ -293,9 +293,11 @@ a {
 }
 .fix__summary {
   margin: 0;
+  color: var(--soft);
+  font-size: var(--s-13);
 }
 .fix__again {
-  margin: 4px 0 0;
+  margin: 0;
   display: flex;
   align-items: center;
   gap: 18px;

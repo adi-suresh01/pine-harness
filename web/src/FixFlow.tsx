@@ -26,6 +26,7 @@ interface Props {
 export function FixFlow({ issueKey, fix, stage }: Props) {
   const [error, setError] = useState("");
   const [testing, setTesting] = useState(false);
+  const [showPatch, setShowPatch] = useState(false);
   const mine = fix && fix.issueKey === issueKey ? fix : null;
   const working = mine && (mine.phase === "starting" || mine.phase === "running" || mine.phase === "checking");
 
@@ -69,7 +70,7 @@ export function FixFlow({ issueKey, fix, stage }: Props) {
           {mine.openedPrs?.length ? ` It opened ${mine.openedPrs.join(", ")} while working.` : ""}
         </p>
       )}
-      <Diff text={mine.patch ?? ""} />
+      {!done && <Diff text={mine.patch ?? ""} />}
       {done ? (
         <>
           <ul className="fix__results">
@@ -86,8 +87,8 @@ export function FixFlow({ issueKey, fix, stage }: Props) {
           </ul>
           {/* the result stays on screen, and so does the way to do it again from scratch */}
           <p className="fix__again">
-            <button className="btn btn--quiet" onClick={ask}>
-              Fix it again, live
+            <button className="link" aria-expanded={showPatch} onClick={() => setShowPatch((v) => !v)}>
+              {showPatch ? "Hide the patch" : "Show the patch"}
             </button>
             {stage?.podState === "warm" && (
               <button
@@ -104,6 +105,12 @@ export function FixFlow({ issueKey, fix, stage }: Props) {
                 Test again on the GPU
               </button>
             )}
+          </p>
+          {showPatch && <Diff text={mine.patch ?? ""} />}
+          <p>
+            <button className="btn btn--quiet" onClick={ask}>
+              Fix it again, live
+            </button>
           </p>
         </>
       ) : running ? (
