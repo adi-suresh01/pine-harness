@@ -47,8 +47,8 @@ export async function releaseHuman(postedUrl?: string) {
   const { session, state } = await posterSession();
   const computer = await ensureComputer(POSTER_SLOT);
   const control = await computer.releaseControl(session.name);
-  // save the GitHub sign-in now, not whenever the runtime happens to stop
-  await computer.checkpoint().catch((err) => console.warn(`poster checkpoint failed: ${(err as Error).message}`));
+  // save the GitHub sign-in now, not whenever the runtime happens to stop; it can take a while, so nobody waits on it
+  void computer.checkpoint().catch((err) => console.warn(`poster checkpoint failed: ${(err as Error).message}`));
   if (postedUrl) {
     state.posted.push({ issueUrl: postedUrl, at: new Date().toISOString() });
     await writeJson(POSTER_FILE, state);

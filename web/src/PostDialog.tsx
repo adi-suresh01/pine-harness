@@ -31,10 +31,11 @@ export function PostDialog({ url, draft, onClose }: Props) {
 
   const delegate = useCallback(() => posterDesktop(), []);
 
-  const finish = async (posted: boolean) => {
-    await posterRelease(posted ? url : undefined).catch(() => undefined);
+  // close at once; handing control back happens in the background
+  const finish = (posted: boolean) => {
     ref.current?.close();
     onClose();
+    void posterRelease(posted ? url : undefined).catch(() => undefined);
   };
 
   return (
