@@ -1,0 +1,17 @@
+.DS_Store
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+node_modules/
+dist/
+build/
+.next/
+.vite/
+target/
+__pycache__/
+.venv/
+*.log
+results/
+runs/
