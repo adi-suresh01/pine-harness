@@ -11,7 +11,8 @@ import type { TriageStatus } from "./triage/run";
 
 const PORT = Number(process.env.PORT ?? 3000);
 // issues with an sm120-kit folder; GPU_ISSUES=a,b overrides
-const DEFAULT_SKILLS = (process.env.DEFAULT_SKILLS ?? "sm120-triage").split(",").filter(Boolean);
+// off by default: across three runs the learned skill was faster but leaned toward calling duplicates
+const DEFAULT_SKILLS = (process.env.DEFAULT_SKILLS ?? "").split(",").filter(Boolean);
 const GPU_ISSUES = (process.env.GPU_ISSUES ?? "vllm-60172,vllm-60847").split(",").filter(Boolean);
 const WEB_DIST = join(ROOT, "web", "dist");
 
@@ -109,7 +110,6 @@ Bun.serve({
       POST: guard(async (req) => {
         const b = await body<{ issues?: string[]; skills?: string[] }>(req);
         try {
-          // the reviewed triage skill is on every Computer; runs use it unless a caller says otherwise
           return json(await startSwarm(b.issues, { skills: b.skills ?? DEFAULT_SKILLS }));
         } catch (err) {
           if (err instanceof RunBusyError) return json({ error: "a run is already going; wait for it to finish" }, 409);
