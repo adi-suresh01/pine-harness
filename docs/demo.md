@@ -7,61 +7,53 @@ part of the sentence, don't stop to explain them.
 
 1. Brave at http://localhost:3000, full screen (Cmd+Ctrl+F), pine theme. Second tab open on
    https://github.com/vllm-project/vllm/issues/60172, signed in as you.
-2. Click **Run 19 agents**, then wait about 2.5 minutes: verdicts start landing at about 2 minutes, so the count climbs
-   while you record. (About $1.30 of agent time.)
+2. Click **Run 19 agents**, then wait about 2.5 minutes: verdicts start landing at about 2 minutes, so the count at the
+   bottom climbs while you record. (About $1.30 of agent time.)
 3. Cmd+Shift+5, Record Entire Screen, microphone on if you narrate live.
 4. The post at 0:58 is real and public. For a practice take, stop at GitHub's Comment button and click
    **Close without posting**.
 
 ## The take
 
-**0:00, the live run.** Leave the screen on the agent that is working; the verdict count at the bottom climbs.
-
-> This week I fixed GPU serving bugs in vLLM and SGLang. Most of that time went into triage, not GPUs.
-> So I gave 19 open issues their own **Pine Computer**, each with its own **agent** in a real Chrome.
-
-**0:12, the swarm.**
-
-> Every run gets a **fresh session**, so no agent remembers another one's verdict.
-> That's the actual desktop, streamed in with Pine's **Web SDK**, and every step comes in on the **event stream**.
-> That's what moves the count at the bottom.
-
-**0:25, hover Issues at the bottom, click one that just got a verdict.**
-
-> Each verdict comes back as an **artifact**, and every link it cites is checked against GitHub before it shows up.
-> Across today's runs, 339 of 339 links checked out.
-
-**0:35, run picker to 3:33 PM, hover Issues, click #60172 under Duplicate.**
-
-> This one is a duplicate I'd missed, with a fix PR I'd never seen.
-> A Pine agent got the issue and the exact vLLM source as **attachments** and wrote its own patch.
-> Then my **harness** put it on a real RTX PRO 6000: unpatched fails at boot, the patch serves.
-
-Point at **Fix issue**.
-
-> And this button does it again from scratch, live.
-
-**0:50, hover Issues, click one under Needs a GPU, then Find root cause.**
-
-> For the ones that need a GPU, the agent already wrote the experiment plan. My harness runs it once I approve the
-> price. Next, the agent writes the kit too.
-
-**0:58, back to #60172, click Post comment.** Copy comment, click the comment box on the desktop, Cmd+V, click
-Comment, then **I posted it**.
-
-> Agents never post. Pine **hands me control** of the one Computer signed in to my GitHub.
-> Its **persistent identity** kept that sign-in through a restart today. I'm the one who clicks Comment.
-
-**1:15, switch to the GitHub tab, refresh, scroll to the new comment.**
-
-> And it's live on the thread: the repro, the trigger, all three open fixes compared.
-
-**1:25, close.**
-
-> 19 issues in under four minutes, about a dollar of agent time.
-> The GPU only runs where it settles something.
+| Time | Click | Say | Pine feature on screen |
+|---|---|---|---|
+| 0:00 | Nothing. Leave it on the agent that is working; the verdict count at the bottom climbs. | "This week I fixed GPU serving bugs in vLLM and SGLang. Most of that time went into triage, not GPUs. So I gave 19 open issues their own **Pine Computer**, each with its own **agent** in a real Chrome." | Pine Computer, agent |
+| 0:12 | Nothing. Let the live desktop move. | "Every run gets a **fresh session**, so no agent remembers another one's verdict. That's the actual desktop, streamed in with Pine's **Web SDK**, and every step comes in on the **event stream**. That's what moves the count at the bottom." | Fresh session, Web SDK, event stream |
+| 0:25 | Hover **Issues** at the bottom, click one that just got a verdict. | "Each verdict comes back as an **artifact**, and every link it cites is checked against GitHub before it shows up. Across today's runs, 339 of 339 links checked out." | Artifact |
+| 0:35 | Run picker (top right) to **3:33 PM**. Hover **Issues**, click **#60172** under Duplicate. | "This one is a duplicate I'd missed, with a fix PR I'd never seen. A Pine agent got the issue and the exact vLLM source as **attachments** and wrote its own patch. Then my harness put it on a real RTX PRO 6000: unpatched fails at boot, the patch serves." | Attachments |
+| 0:45 | Point at **Fix issue** under Post comment. Don't click it. | "And this button does it again from scratch, live." | Agent |
+| 0:50 | Hover **Issues**, click any number under Needs a GPU, then **Find root cause**. | "For the ones that need a GPU, the agent already wrote the experiment plan. My harness runs it once I approve the price. Next, the agent writes the kit too." | Artifact |
+| 0:58 | Hover **Issues**, click **#60172**, then **Post comment**. **Copy comment**, click GitHub's comment box on the desktop, Cmd+V, click GitHub's **Comment**, then **I posted it**. | "Agents never post. Pine **hands me control** of the one Computer signed in to my GitHub. Its **persistent identity** kept that sign-in through a restart today. I'm the one who clicks Comment." | Take control, persistent identity |
+| 1:15 | Switch to the GitHub tab, refresh, scroll to the new comment. | "And it's live on the thread: the repro, the trigger, all three open fixes compared." | |
+| 1:25 | Nothing. | "19 issues in under four minutes, about a dollar of agent time. The GPU only runs where it settles something." | |
 
 Stop recording. Trim the ends in QuickTime (Edit, Trim) if it runs over 90 seconds.
+
+## Every Pine feature this uses
+
+On screen in the take:
+
+| Feature | Where it shows | SDK |
+|---|---|---|
+| Pine Computer | One per issue, 19 at once, plus one for posting | `createComputer`, `startComputer`, `recoverComputer`, project policy of 20 Computers |
+| Agent | Reads each thread in a real Chrome; writes the fix | `agent.run` with `maxWallMs`, `agent.wait`, `agent.answer` |
+| Fresh session | Each run starts clean | `createSession`, `destroySession` |
+| Web SDK | The live desktop on the page | `@pinesandbox/computer-web` `PineDesktop`, `delegateDesktop` tokens |
+| Event stream | The step under the screen, the screenshots, the verdict count | `agent.events` (progress, activity, frame, result) |
+| Artifact | `verdict.json` and the agent's `agent-fix.diff` | `listArtifacts`, `readArtifact` |
+| Attachments | The brief, and the vLLM source file for the fix | `writeFile` |
+| Take control | Post comment hands me the desktop | `takeControl`, `releaseControl`, `controlState` |
+| Persistent identity | The posting Computer stays signed in to GitHub | saved credentials, `recoverComputer` |
+
+Behind the scenes, worth a line if a judge asks:
+
+| Feature | What it does here | SDK |
+|---|---|---|
+| Learned skill | Pine learned `sm120-triage` from the first good run | `session.learn`, `skills.activate` |
+| Skill review | I reviewed the draft and uploaded my edit before agents used it; that's how I caught its duplicate bias | `skills.drafts`, `session.authorSkill` |
+| Tabs | The posting Computer opens the issue in a fresh, focused tab | `createTab`, `patchTab`, `focus`, `closeTab` |
+| Checkpoint | Saves the posting Computer after I hand control back | `checkpoint` |
+| Secrets | The GitHub token reaches the agent as a secret, never in the prompt | `agent.run` `secrets` |
 
 ## If a judge asks
 
