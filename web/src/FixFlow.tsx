@@ -71,18 +71,41 @@ export function FixFlow({ issueKey, fix, stage }: Props) {
       )}
       <Diff text={mine.patch ?? ""} />
       {done ? (
-        <ul className="fix__results">
-          {tested.map((v) => (
-            <li key={v.name} className={v.verdict === "OK" ? "is-ok" : "is-fail"}>
-              <b>{NAME[v.name]}</b>{" "}
-              {v.verdict === "OK"
-                ? `serves${typeof v.gsm8k === "number" ? `, GSM8K ${v.gsm8k.toFixed(2)}` : ""}`
-                : v.smem
-                  ? `fails at boot: needs ${v.smem.required.toLocaleString()} bytes of shared memory, the GPU has ${v.smem.limit.toLocaleString()}`
-                  : `fails at boot${v.fault ? `: ${v.fault.slice(0, 60)}` : ""}`}
-            </li>
-          ))}
-        </ul>
+        <>
+          <ul className="fix__results">
+            {tested.map((v) => (
+              <li key={v.name} className={v.verdict === "OK" ? "is-ok" : "is-fail"}>
+                <b>{NAME[v.name]}</b>{" "}
+                {v.verdict === "OK"
+                  ? `serves${typeof v.gsm8k === "number" ? `, GSM8K ${v.gsm8k.toFixed(2)}` : ""}`
+                  : v.smem
+                    ? `fails at boot: needs ${v.smem.required.toLocaleString()} bytes of shared memory, the GPU has ${v.smem.limit.toLocaleString()}`
+                    : `fails at boot${v.fault ? `: ${v.fault.slice(0, 60)}` : ""}`}
+              </li>
+            ))}
+          </ul>
+          {/* the result stays on screen, and so does the way to do it again from scratch */}
+          <p className="fix__again">
+            <button className="btn btn--quiet" onClick={ask}>
+              Fix it again, live
+            </button>
+            {stage?.podState === "warm" && (
+              <button
+                className="link"
+                onClick={() => {
+                  setError("");
+                  setTesting(true);
+                  post("/api/gpu/test", { issueKey }).catch((e: Error) => {
+                    setError(e.message);
+                    setTesting(false);
+                  });
+                }}
+              >
+                Test again on the GPU
+              </button>
+            )}
+          </p>
+        </>
       ) : running ? (
         <p className="fix__line">
           <span className="pulse" aria-hidden /> Running on the GPU
