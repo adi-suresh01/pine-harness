@@ -89,13 +89,19 @@ If all exact candidate fixes remain open, state that no merged release fix was f
 
 ## 5. Choose exactly one category
 
-Apply these rules in order, based on checked evidence:
+Take the first rule that the checked evidence satisfies. The order matters: what a maintainer needs to do next
+decides the category, so a merged fix wins over an older issue that reports the same thing.
 
-- `duplicate`: An earlier issue tracks the same root failure and code path. This remains the right category when candidate fixes are still open.
-- `already_fixed`: An exact fix is merged (released or nightly only), or the reporter or a maintainer confirms on the thread that it no longer reproduces on a newer build.
-- `needs_info`: Essential reporter details are missing and one specific answer is required before the issue can be classified or reproduced.
-- `needs_repro`: The report is credible and sufficiently specified, but the exact failure still requires a targeted reproduction to distinguish plausible causes.
-- `not_a_bug`: Checked evidence shows expected or documented behavior rather than a defect.
+1. `not_a_bug`: the report is a field report, a question, config help or expected behavior, with nothing to fix.
+2. `already_fixed`: an exact fix is merged (released or nightly only), or the reporter or a maintainer confirms on the
+   thread that it no longer reproduces on a newer build. This holds even when an older issue tracks the same failure:
+   cite that issue as extra evidence, but the category is `already_fixed`.
+3. `duplicate`: an earlier issue tracks the same root failure and code path, and no fix for it has merged. Open
+   candidate fixes are fine.
+4. `needs_info`: essential reporter details are missing (versions, logs, a retest), and one specific answer is needed
+   before anyone can act.
+5. `needs_repro`: the report is credible and complete, no fix has merged, and the next step is running it on a GPU to
+   confirm it or to test a candidate PR.
 
 Use `high` confidence only when exact paths and failure signatures agree. Use `medium` or `low` when the match depends on incomplete or indirect evidence.
 
