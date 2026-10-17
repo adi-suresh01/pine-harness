@@ -3,6 +3,7 @@ import type { Score } from "../../server/score";
 import type { RunMeta } from "../../server/swarm";
 import type { TimelineEvent, TriageStatus } from "../../server/triage/run";
 import type { Category } from "../../server/verdict";
+import type { FixStatus } from "../../server/fix";
 
 export type { Category, Issue, Score, TimelineEvent, TriageStatus };
 export type Run = RunMeta & { live: boolean };
@@ -15,7 +16,10 @@ export interface AppState {
   score: Score;
   /** comments I reviewed and edited, by issue key; these win over the agent's draft */
   reviewed: Record<string, string>;
+  fix: FixStatus | null;
+  fixable: string[];
 }
+export type { FixStatus };
 
 export const CATEGORY_LABEL: Record<Category, string> = {
   already_fixed: "Already fixed",
@@ -41,6 +45,7 @@ export async function getState(runId?: string): Promise<AppState> {
 export const startRun = (issues?: string[]) => post<RunMeta>("/api/runs", { issues });
 export const triageDesktop = (runId: string, issueKey: string) => post<Delegation>("/api/desktop", { runId, issueKey });
 export const posterDesktop = () => post<Delegation>("/api/poster/desktop", {});
+export const fixDesktop = () => post<Delegation>("/api/fix/desktop", {});
 export const posterOpen = (url: string) => post<{ delegation: Delegation }>("/api/poster/open", { url });
 export const posterRelease = (postedUrl?: string) => post<{ controller: string }>("/api/poster/release", { postedUrl });
 

@@ -6,6 +6,7 @@ const POD: Record<GpuRun["podState"], string> = {
   quoted: "",
   starting: "Renting the GPU",
   setup: "Pod is up, downloading the model",
+  warm: "Warm GPU ready",
   running: "Running the matrix",
   done: "Pod shut down",
 };

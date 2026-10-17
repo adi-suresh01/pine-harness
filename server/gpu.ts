@@ -20,7 +20,8 @@ export interface GpuVariant {
 export interface GpuRun {
   issueKey: string;
   kitReady: boolean;
-  podState: "none" | "quoted" | "starting" | "setup" | "running" | "done";
+  /** setup: renting or installing; warm: set up and idle, ready for a quick exec */
+  podState: "none" | "quoted" | "starting" | "setup" | "warm" | "running" | "done";
   gpu?: string;
   rateUsdHr?: number;
   spentUsd?: number;
@@ -59,13 +60,24 @@ export async function gpuRun(issueKey: string): Promise<GpuRun> {
   for (const e of recent) {
     run.updatedAt = e.ts;
     if (e.kind === "create") Object.assign(run, { podState: "starting", gpu: e.gpu ?? run.gpu, rateUsdHr: e.rate_usd_hr ?? run.rateUsdHr });
-    else if (e.kind === "ready" || e.kind === "setup") run.podState = "setup";
+    else if (e.kind === "ready") run.podState = "setup";
+    // the setup event lands once setup.sh has finished: image pulled, checkpoint on disk
+    else if (e.kind === "setup") run.podState = "warm";
     else if (e.kind === "variant_start") {
       run.podState = "running";
-      Object.assign(variant(e.variant), { phase: "starting", patched: Array.isArray(e.patches) && e.patches.length > 0 });
+      // a new exec of the same variant starts clean: an earlier test's verdict must not show while this one runs
+      Object.assign(variant(e.variant), {
+        phase: "starting",
+        patched: Array.isArray(e.patches) && e.patches.length > 0,
+        verdict: undefined,
+        gsm8k: undefined,
+        fault: undefined,
+        bootS: undefined,
+      });
     } else if (e.kind === "phase" && e.variant) variant(e.variant).phase = e.phase;
     else if (e.kind === "verdict" && e.variant) {
       Object.assign(variant(e.variant), { verdict: e.verdict, bootS: e.boot_s, fault: e.fault, gsm8k: e.gsm8k, phase: "done" });
+      if ([...byName.values()].every((v) => v.phase === "done")) run.podState = "warm";
     } else if (e.kind === "terminate") Object.assign(run, { podState: "done", spentUsd: e.cost_usd });
     else if (e.kind === "budget" && typeof e.spent_usd === "number") run.spentUsd = e.spent_usd;
   }
@@ -154,4 +166,22 @@ async function approve(issueKey: string, shownWorstCaseUsd: number): Promise<Gpu
   const p = Bun.spawn(["harness", "run", q.kit], { cwd: KIT, env: process.env, stdout: log, stderr: log });
   running.set(q.kit, p);
   return q;
+}
+
+const execs = new Map<string, Bun.Subprocess>();
+
+/**
+ * Runs the unpatched fp8 variant and the agent's patch on the warm pod. No new pod: it reuses the one started before
+ * the demo, so it spends only the minutes it runs. Refuses when nothing is warm.
+ */
+export async function testOnWarmPod(issueKey: string): Promise<{ kit: string }> {
+  const kit = STAGE_KITS[issueKey];
+  if (!kit) throw new Error(`no stage kit for ${issueKey}`);
+  const e = execs.get(kit);
+  if (e && e.exitCode === null) throw new Error("a test is already running on the pod");
+  const g = await gpuRun(kit);
+  if (g.podState !== "warm") throw new Error(g.podState === "running" ? "the pod is busy" : "no warm pod; start one with harness up first");
+  const log = Bun.file(join(KIT, "results", `${kit}.exec.log`));
+  execs.set(kit, Bun.spawn(["harness", "exec", kit, "fp8-kv", "fp8-kv-agent"], { cwd: KIT, env: process.env, stdout: log, stderr: log }));
+  return { kit };
 }

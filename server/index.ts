@@ -1,6 +1,7 @@
 import { join, normalize } from "node:path";
 import { loadBacklog } from "./backlog";
-import { STAGE_KITS, approveGpuRun, gpuQuote, gpuRun } from "./gpu";
+import { STAGE_KITS, approveGpuRun, gpuQuote, gpuRun, testOnWarmPod } from "./gpu";
+import { currentFix, fixableIssues, startFix } from "./fix";
 import { subscribe } from "./bus";
 import { runningComputer } from "./pine/fleet";
 import { openForHuman, posterDelegation, releaseHuman } from "./poster";
@@ -64,6 +65,8 @@ async function state(runId?: string) {
     statuses,
     score: score(backlog, statuses),
     reviewed: await reviewedDrafts(backlog.map((i) => i.key)),
+    fix: currentFix() ?? null,
+    fixable: fixableIssues(),
   };
 }
 
@@ -109,6 +112,29 @@ Bun.serve({
       POST: guard(async (req) => {
         const b = await body<{ issueKey: string }>(req);
         return json(await gpuQuote(b.issueKey));
+      }),
+    },
+    // a Pine agent writes a patch; the server checks it before anything runs it
+    "/api/fix": {
+      POST: guard(async (req) => {
+        const b = await body<{ issueKey: string }>(req);
+        return json(await startFix(b.issueKey));
+      }),
+    },
+    "/api/fix/desktop": {
+      POST: guard(async () => {
+        const f = currentFix();
+        if (!f?.sessionName) return json({ error: "no fix agent running" }, 404);
+        const computer = await runningComputer(f.slot);
+        if (!computer) return json({ error: "that Computer is not running" }, 404);
+        return json((await computer.delegateDesktop(f.sessionName, { create: false })).toJSON());
+      }),
+    },
+    // runs the unpatched fp8 variant and the agent's patch on the pod warmed before the demo; rents nothing new
+    "/api/gpu/test": {
+      POST: guard(async (req) => {
+        const b = await body<{ issueKey: string }>(req);
+        return json(await testOnWarmPod(b.issueKey));
       }),
     },
     // the person's click on Approve, at the worst case they were shown

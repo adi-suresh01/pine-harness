@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { GpuRun } from "../../server/gpu";
-import { frameUrl, loadTimeline, triageDesktop, type Issue, type TimelineEvent, type TriageStatus } from "./api";
-import { GpuApprove } from "./GpuApprove";
+import { fixDesktop, frameUrl, loadTimeline, triageDesktop, type FixStatus, type Issue, type TimelineEvent, type TriageStatus } from "./api";
+import { FixFlow } from "./FixFlow";
 import { LiveDesktop } from "./LiveDesktop";
 import { Prose } from "./Prose";
 import { checkedLine, firstSentence, gpuLine, headline } from "./verdictText";
@@ -14,11 +14,14 @@ interface Props {
   gpu: GpuRun | undefined;
   /** the short kit a live demo may run for this issue, when there is one */
   stage: GpuRun | undefined;
+  fix: FixStatus | null;
+  fixable: boolean;
+  fixEvents: TimelineEvent[];
   reviewed: string | undefined;
   onPost: (draft: string) => void;
 }
 
-export function Stage({ issue, status, runId, live, gpu, stage, reviewed, onPost }: Props) {
+export function Stage({ issue, status, runId, live, gpu, stage, fix, fixable, fixEvents, reviewed, onPost }: Props) {
   const [history, setHistory] = useState<TimelineEvent[]>([]);
   const [open, setOpen] = useState<"comment" | "evidence" | null>(null);
 
@@ -38,6 +41,9 @@ export function Stage({ issue, status, runId, live, gpu, stage, reviewed, onPost
   const running = status?.phase === "running" && !!status.sessionName;
   const lastFrame = [...events].reverse().find((e) => e.frame)?.frame?.file ?? status?.lastFrame;
   const lastStep = stepText([...events].reverse().find((e) => e.activity)?.activity);
+  // while a Pine agent writes the fix, the hero is its desktop
+  const fixing = !!fix && fix.issueKey === issue.key && !!fix.sessionName && (fix.phase === "running" || fix.phase === "starting");
+  const fixStep = stepText([...fixEvents].reverse().find((e) => e.activity)?.activity);
 
   const done = status?.phase === "done" && status.verdict;
   const cat = done ? (status.verified?.categoryOut ?? status.verdict!.category) : undefined;
@@ -48,8 +54,10 @@ export function Stage({ issue, status, runId, live, gpu, stage, reviewed, onPost
   return (
     <section className="stage" aria-label={`${issue.repo}#${issue.number}`}>
       <div className="stage__left">
-      <div className={`screen ${running ? "screen--live" : ""}`}>
-        {running ? (
+      <div className={`screen ${running || fixing ? "screen--live" : ""}`}>
+        {fixing ? (
+          <LiveDesktop key={fix!.fixId} delegate={fixDesktop} desktopKey={fix!.fixId} />
+        ) : running ? (
           <LiveDesktop key={`${runId}/${issue.key}`} delegate={delegate} desktopKey={`${runId}/${issue.key}`} />
         ) : lastFrame ? (
           <img src={frameUrl(runId, issue.key, lastFrame)} alt="The agent's last screen" />
@@ -64,7 +72,11 @@ export function Stage({ issue, status, runId, live, gpu, stage, reviewed, onPost
         </a>
         <span className="caption__title">{issue.title.replace(/^\[[^\]]+\]:?\s*/, "")}</span>
         <span className="caption__now">
-          {running && lastStep ? (
+          {fixing ? (
+            <>
+              <span className="pulse" aria-hidden /> Fixing: {fixStep ?? "starting"}
+            </>
+          ) : running && lastStep ? (
             <>
               <span className="pulse" aria-hidden /> {lastStep}
             </>
@@ -89,7 +101,7 @@ export function Stage({ issue, status, runId, live, gpu, stage, reviewed, onPost
             {gt && gt.category === cat && " Matches my hand triage."}
           </p>
           {g && <p className="verdict__gpu">{g}.</p>}
-          {stage?.kitReady && <GpuApprove issueKey={issue.key} stage={stage} />}
+          {fixable && <FixFlow issueKey={issue.key} fix={fix} stage={stage} />}
           {draft && (
             <button className="btn verdict__post" onClick={() => onPost(draft)}>
               Post comment

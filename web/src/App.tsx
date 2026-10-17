@@ -92,6 +92,10 @@ export function App() {
       const k = `${r}/${issueKey}`;
       setLiveEvents((prev) => ({ ...prev, [k]: [...(prev[k] ?? []).slice(-200), event] }));
     });
+    es.addEventListener("fix", (e) => {
+      const f = JSON.parse((e as MessageEvent).data);
+      setState((prev) => (prev ? { ...prev, fix: f } : prev));
+    });
     es.addEventListener("run", () => void refresh());
     // the stream reconnects on its own; whatever happened while it was down only shows in a fresh read
     es.addEventListener("hello", () => void refresh());
@@ -166,6 +170,9 @@ export function App() {
           live={liveEvents[`${run.runId}/${focus.key}`] ?? []}
           gpu={gpu.find((g) => g.issueKey === focus.key && g.kitReady)}
           stage={gpu.find((g) => g.issueKey === `${focus.key}-stage`)}
+          fix={state.fix}
+          fixable={state.fixable?.includes(focus.key) ?? false}
+          fixEvents={state.fix ? (liveEvents[`${state.fix.fixId}/${state.fix.issueKey}`] ?? []) : []}
           reviewed={state.reviewed?.[focus.key]}
           onPost={(draft) => setPosting({ url: focus.url, draft })}
         />

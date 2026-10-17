@@ -170,7 +170,7 @@ async function readVerdictText(session: Session, turnId: string): Promise<string
 }
 
 // The session is fresh, so every event in it belongs to this triage, including the turn an answer opens.
-async function followEvents(
+export async function followEvents(
   session: Session,
   where: { runId: string; issueKey: string; dir: string },
   signal: AbortSignal,
