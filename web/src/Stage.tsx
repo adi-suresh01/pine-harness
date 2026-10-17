@@ -34,7 +34,7 @@ export function Stage({ issue, status, runId, live, gpu, reviewed, onPost }: Pro
   const events = [...history, ...live.filter((e) => !seen.has(e.eventId))];
   const running = status?.phase === "running" && !!status.sessionName;
   const lastFrame = [...events].reverse().find((e) => e.frame)?.frame?.file ?? status?.lastFrame;
-  const lastStep = [...events].reverse().find((e) => e.activity)?.activity?.title;
+  const lastStep = stepText([...events].reverse().find((e) => e.activity)?.activity);
 
   const done = status?.phase === "done" && status.verdict;
   const cat = done ? (status.verified?.categoryOut ?? status.verdict!.category) : undefined;
@@ -45,7 +45,7 @@ export function Stage({ issue, status, runId, live, gpu, reviewed, onPost }: Pro
   return (
     <section className="stage" aria-label={`${issue.repo}#${issue.number}`}>
       <div className="stage__left">
-      <div className="screen">
+      <div className={`screen ${running ? "screen--live" : ""}`}>
         {running ? (
           <LiveDesktop key={`${runId}/${issue.key}`} delegate={delegate} desktopKey={`${runId}/${issue.key}`} />
         ) : lastFrame ? (
@@ -122,6 +122,16 @@ export function Stage({ issue, status, runId, live, gpu, reviewed, onPost }: Pro
       )}
     </section>
   );
+}
+
+// The caption names what the agent is doing in plain words; a shell step's title is the whole command line.
+function stepText(a: TimelineEvent["activity"]): string | undefined {
+  if (!a) return undefined;
+  if (a.kind === "command") return /verdict|json/i.test(a.title) ? "Checking its verdict file" : "Searching issues and PRs";
+  if (a.kind === "file") return /verdict/i.test(a.title) ? "Writing the verdict" : "Taking notes";
+  if (a.kind === "skill") return "Following the sm120-triage skill";
+  const t = a.title.replace(/\s*·\s*GitHub$/, "").replace(/^Open /, "Reading ");
+  return t.length > 90 ? `${t.slice(0, 88)}...` : t;
 }
 
 const LOWER: Record<string, string> = {

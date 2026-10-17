@@ -176,6 +176,10 @@ a {
   border-radius: 14px;
   overflow: hidden;
 }
+/* the live desktop streams at 16:9; saved screenshots are the browser's 2:1 viewport */
+.screen--live {
+  aspect-ratio: 16 / 9;
+}
 .screen img {
   width: 100%;
   height: 100%;
@@ -374,7 +378,7 @@ a {
 }
 .group--open .dotbtn {
   background: transparent;
-  box-shadow: inset 0 0 0 2px var(--faint);
+  box-shadow: inset 0 0 0 2px var(--soft);
 }
 .dotbtn.is-failed {
   background: var(--faint);
@@ -386,7 +390,7 @@ a {
   box-shadow: 0 0 0 3px var(--paper), 0 0 0 5px var(--cat, var(--ink));
 }
 .group--open .dotbtn.is-selected {
-  box-shadow: inset 0 0 0 2px var(--faint), 0 0 0 3px var(--paper), 0 0 0 5px var(--ink);
+  box-shadow: inset 0 0 0 2px var(--soft), 0 0 0 3px var(--paper), 0 0 0 5px var(--ink);
 }
 @media (prefers-reduced-motion: no-preference) {
   .group--open .dotbtn.is-working,
