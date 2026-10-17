@@ -32,8 +32,12 @@ async function posterSession(): Promise<{ session: Session; state: PosterState }
  */
 export async function openForHuman(url: string) {
   const { session } = await posterSession();
-  await session.createTab(url);
   const computer = await ensureComputer(POSTER_SLOT);
+  // Pine refuses tab calls while a person holds control (409 control-not-held), and a second click or an
+  // earlier dialog can leave it held, so hand it back before opening the page
+  const control = await session.controlState().catch(() => undefined);
+  if (control?.controller === "human") await computer.releaseControl(session.name);
+  await session.createTab(url);
   await computer.takeControl(session.name);
   const delegation = await computer.delegateDesktop(session.name, { create: false });
   return { sessionName: session.name, delegation: delegation.toJSON() };
