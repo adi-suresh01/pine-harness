@@ -1,89 +1,103 @@
-# Demo script (about 3 minutes)
+# Demo script
 
-Before going on (20 minutes ahead):
-- `cd ~/Desktop/sm120-kit && harness up vllm-60172-stage` to warm the GPU (about 5 minutes, $2.49/hr, shuts itself
-  down at its 1.5-hour deadline; `harness down vllm-60172-stage` right after the demo).
+Bold words are the Pine feature on screen at that moment; say them, don't explain them.
+
+## Before going on (20 minutes ahead)
+
+- `cd ~/Desktop/sm120-kit && harness up vllm-60172-stage`: warms the GPU (about 5 minutes, $2.49/hr, 1.5-hour cap).
+  `harness down vllm-60172-stage` right after the demo.
 - `./scripts/with-env.sh bun run scripts/fleet.ts up 19` so no agent waits on a Computer start.
 - Page open at http://localhost:3000 in Brave, full screen (Cmd+Ctrl+F). Poster desktop still signed in.
-- The afternoon run stays in the run picker as the backup.
+- If the slot is 3 minutes, see "Short version" at the bottom.
 
-## 0:00 Hook, and start the run
+## 0:00 Hook, and start everything
 
-Click **Run 19 agents** first, then talk.
+Click **Run 19 agents**.
 
 > This week I fixed LLM serving bugs on Blackwell workstation GPUs, in vLLM and SGLang.
 > Most of that time didn't go into GPUs. It went into triage.
 > Reading the thread. Finding the PR that already fixed it. Checking which release it shipped in.
-> So I gave every open issue its own Pine Computer.
+> So I gave every open issue its own **Pine Computer**.
 
-## 0:25 The swarm
+## 0:20 The swarm
 
-Point at the screen.
-
-> That's 19 open sm_120 issues, 19 Computers, 19 agents, each in a real Chrome.
-> This one is reading a vLLM issue right now. It searches PRs by the function and kernel names in the traceback,
-> because the fix usually never links the issue.
+> 19 open issues, 19 Computers, each with its own **agent** in a real Chrome.
+> Every run gets a **fresh session**, so no agent remembers another one's verdict.
+> What you're watching is the actual desktop, streamed in with Pine's **Web SDK**.
 
 Point at the dots.
 
-> Each dot is an issue. When an agent finishes, its dot takes the verdict's color and moves into that group.
+> Each step and screenshot comes in on Pine's **event stream**. When an agent finishes,
+> its dot takes the verdict's color and slides into that group.
 
-## 0:55 Why you can trust it
+## 0:45 Start the fix (it runs while you talk)
 
-> Every link an agent cites gets checked against GitHub before it shows up here.
-> If it says fixed and the PR never merged, it gets moved back to needs info.
+Pick the 1:15 PM run in the run picker, click the #60172 dot, click **Ask a Pine agent to fix it**.
+The main screen switches to that agent's desktop.
 
-## 1:15 The result (switch to the afternoon run if the live one is still going)
+> This is a bug I reproduced this afternoon. Now a new Pine agent gets the issue and the exact vLLM 0.31 source,
+> as **attachments**. It isn't allowed to look at the open fix PRs. It has to work it out from the error and the code.
 
-> I hand-triaged 8 of these this week. Across three runs it matches me on 4 to 6 of them,
-> and the misses are judgment calls between duplicate and fixed.
-> Every one of the 256 links the agents cited checked out. None were made up.
-> And it found things I missed. #60172 is a duplicate of an older GB10 report,
-> and there's a third fix PR I never saw.
+## 1:00 Why you can trust the triage
 
-Click the #60172 dot.
+> Every verdict comes back as a file the turn produced, a Pine **artifact**, and every link in it gets checked against
+> GitHub. If it says fixed and the PR never merged, it gets moved back to needs info.
+> Across three runs it matches my own triage on 4 to 6 of 8, and all 256 links it cited checked out. None made up.
+> It also found things I missed: #60172 duplicates an older GB10 report, and there's a third fix PR I never saw.
 
-## 1:45 Fix it, live
+## 1:45 Test it on the GPU
 
-Click **Ask a Pine agent to fix it**. The main screen switches to that agent's desktop.
+The diff lands in the verdict column (about 1.5 minutes after you asked). Click **Test it on the warm GPU**.
 
-> Now a fresh Pine agent gets the issue and the exact vLLM 0.31 source of the file in the traceback.
-> It isn't allowed to look at the open fix PRs. It has to work it out from the error and the code.
+> That patch already passed one check: it applies to 0.31 and touches only that file.
+> Now a real RTX PRO 6000 decides. First the unpatched code with the reporter's fp8 KV cache, then the agent's patch.
 
-About 2 minutes. The diff appears in the verdict column, and the server has already checked it applies to v0.31.0
-and touches only that file.
-
-Click **Test it on the warm GPU** (the pod was warmed 20 minutes before the demo).
-
-> This is a real RTX PRO 6000 that's been warm since before I came up. First the unpatched code with the reporter's
-> fp8 KV cache, then the agent's patch.
-
-About 2 minutes. Red, then green:
-
-> Unpatched: fails at boot, Required 102400, limit 101376. The agent's patch: serves.
-> This afternoon the same harness compared all three open fix PRs: all three pass, GSM8K inside noise, 47 cents.
-
-If the agent's patch is red: "the GPU says no, and that's the point: nothing ships on an agent's word."
-
-## 2:15 Post it
+## 2:00 Post the comment (while the GPU runs)
 
 Click **Post comment**, then Copy comment, click the comment box on the desktop, Cmd+V, click Comment.
 
-> Agents never post. This Computer is the only one signed in to my GitHub, and no agent runs on it.
-> Pine hands me the controls, and I click Comment.
+> Agents never post. This one Computer is signed in to my GitHub, and Pine's **persistent identity** keeps that
+> sign-in across restarts. No agent ever runs on it.
+> Pine **hands me control**, and I'm the one who clicks Comment.
+> The comment is this afternoon's GPU run: reproduced on one GPU, fp8 is the trigger, all three open fixes pass.
 
-## 2:45 Close
+## 2:45 The skill
 
-> 19 issues in under 5 minutes, about a dollar fifty of agent time, 47 cents of GPU.
+> Pine also **learned a skill** from the first good triage run. It made runs about 20 percent faster,
+> but it leaned toward calling things duplicates, because it learned from one. Pine makes you **review a skill** before
+> any agent uses it, and that review is how I caught it. So it's off for now.
+
+## 3:15 Red, then green (the GPU test lands about 3.5 minutes after the click)
+
+> Unpatched: fails at boot, Required 102400, limit 101376. The agent's patch: serves.
+
+Then, if you want the expert beat:
+
+> And I still wouldn't ship it. It reads the default shared-memory size, which is 48K on every NVIDIA GPU,
+> so Hopper would lose a pipeline stage too. The GPU can't see that. That's why agents draft, the GPU checks,
+> and I decide.
+
+If the patch is red: "the GPU says no, and that's the point: nothing ships on an agent's word."
+
+## Close
+
+> 19 issues in under 5 minutes, about a dollar fifty of agent time, cents of GPU.
 > Maintainers spend days on this. Now the GPU only runs where it settles something.
+
+## Short version (3-minute slot)
+
+Run the fix and the GPU test in the 10 minutes before going on, so #60172 already shows the agent's diff and red/green.
+On stage: Run 19 agents, the swarm (0:20), trust (1:00), click #60172 and walk through diff, red, green (1:45),
+Post comment (2:15), close (2:45). Mention the skill only if asked.
 
 ## If asked
 
 - **Why a browser and not the GitHub API?** The evidence is spread across issue threads, PRs that never cite the
   issue, release pages and FlashInfer. The agent reads them the way I do; the server then checks every claim through
   the API.
-- **The skill.** Pine drafted `sm120-triage` from the first good run. With it, runs got about 15 to 20 percent faster
-  (median 160 to 167 s against 210 s) but leaned toward duplicates: it had learned from one duplicate. A rule change
-  didn't fully fix that, so the live run goes without it. Pine makes you review a skill before agents use it, and
-  that review is why I measured it before trusting it.
-- **Cost.** About 8 cents per issue of agent time. GPU only for the issues that need one.
+- **Which Pine features?** Computers and sessions, the agent with attachments and artifacts, the event stream, the Web
+  SDK live desktop, take control, persistent identity, skills (learn, review, activate on 19 Computers), and the
+  agent's own shell for curl and patch. Table in the README.
+- **The skill numbers.** Median 160 to 167 s per issue with it, 210 s without; 5 and 4 of 8 matches with it, 6 without.
+- **Cost.** About 8 cents per issue of agent time. The GPU only for issues that need one: 47 cents for the full
+  three-fix comparison, 43 cents for the rehearsal of the live fix.

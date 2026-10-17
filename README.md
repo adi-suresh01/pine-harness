@@ -27,12 +27,50 @@ the issues that need a GPU go on to the harness.
    against the GitHub API: does it exist, did the PR merge, which release contains it. An already_fixed with no
    merged fix behind it drops to needs_info. A rate limit leaves the verdict alone rather than downgrading it.
 5. **The skill.** After the first good turn, Pine's skill author drafted `sm120-triage` from what the agent did. I
-   reviewed it, fixed two rules (SGLang issues, and a reporter saying "no longer reproduces" counts as fixed), and
-   activated it on every Computer. The draft and my edit are both in `skills/sm120-triage/`.
-6. **The GPU.** needs_repro issues go to sm120-kit. The harness quotes the pod, I approve the budget, it runs the
-   matrix and shuts the pod down. The page shows the run read-only; nothing here can rent a GPU.
-7. **Posting.** Agents never post. "Review and post" opens the issue on the one Computer signed in to my GitHub and
-   hands me the controls through Pine's take-control. I paste the draft and click Comment myself.
+   reviewed it, fixed the rules that didn't fit (SGLang issues, a reporter saying "no longer reproduces" counts as
+   fixed, a merged fix beats an older duplicate) and activated it on all 19 Computers. It made runs faster but leaned
+   toward calling duplicates, so runs go without it by default. The draft and my edits are in `skills/sm120-triage/`.
+6. **The GPU.** needs_repro issues go to sm120-kit. The harness quotes the pod, I approve the price, it runs the matrix
+   and shuts the pod down. The page can start a pod only for a short stage kit, only at the price on screen, and
+   never above $3 worst case.
+7. **The fix.** "Ask a Pine agent to fix it" gives a fresh agent the issue and the exact source of the file in the
+   traceback, and keeps it off the open fix PRs. The server refuses the patch unless it applies to that source and
+   touches only that file. "Test it on the warm GPU" runs the unpatched code and the patch on a warm pod.
+8. **Posting.** Agents never post. "Post comment" opens the issue on the one Computer signed in to my GitHub and hands
+   me the controls through Pine's take-control. I paste the comment and click Comment myself.
+
+## Results from today
+
+Same 19 issues, three runs, all on Pine Computers:
+
+| Run | Skill | Wall time | Median per issue | Agent cost | Matches my hand triage | Cited links that checked out |
+|---|---|---|---|---|---|---|
+| 1 | none | 5.6 min | 210 s | $1.61 | 6 of 8 | 93 of 93 |
+| 2 | learned | 4.5 min | 160 s | $1.53 | 5 of 8 | 85 of 85 |
+| 3 | rules fixed | 4.8 min | 167 s | $1.76 | 4 of 8 | 78 of 78 |
+
+- vllm#60172: the swarm matched it to vllm#53748 (the GB10 report of the same overflow) and found a third fix PR,
+  #54013. On one RTX PRO 6000 the harness reproduced it (fp8 KV cache fails at boot, `Required: 102400, Hardware
+  limit: 101376`) and all three open fixes served, GSM8K-100 0.68 to 0.71 against 0.70 for the control. $0.47.
+- The live fix, rehearsed: a Pine agent wrote its own patch in 82 s for $0.03 without opening the PRs. Unpatched fails
+  at boot, the patch serves (GSM8K-50 0.66). It reads the 48 KiB default shared-memory size instead of the opt-in
+  limit, so it would also slow Hopper down; the GPU can't see that, which is why I review before anything ships.
+
+## Pine Computer features used
+
+| Feature | Where |
+|---|---|
+| Computers: create, reconnect, start, recover, idle timeout, location, project limit | `server/pine/fleet.ts` |
+| Sessions: a fresh one per triage, one for the fixer, a long-lived poster | `fleet.ts`, `fix.ts`, `poster.ts` |
+| Pine's agent: run, wait, answer, cancel, wall-time cap, idempotency keys | `server/triage/run.ts`, `server/fix.ts` |
+| Attachments and artifacts: the brief and source in, `verdict.json` and `agent-fix.diff` out | `run.ts`, `fix.ts` |
+| Event stream: progress, steps and WebP screenshots, live and replayed | `run.ts`, `web/src/Stage.tsx` |
+| Web SDK: the live desktop, desktop tokens per connect, drive mode and clipboard | `web/src/LiveDesktop.tsx` |
+| Take and release control | `server/poster.ts`, `web/src/PostDialog.tsx` |
+| Persistent identity and checkpoints: the GitHub sign-in on the poster | `server/poster.ts` |
+| Skills: learn from a turn, review drafts, upload, activate on 19 Computers, select per run | `scripts/learn.ts`, `scripts/skill.ts` |
+| Tabs and windows: open the issue in front on the poster | `server/poster.ts` |
+| The agent's own shell inside a turn: curl to the GitHub API, diff, patch | the briefs |
 
 ## Run it
 
