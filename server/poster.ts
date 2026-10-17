@@ -37,7 +37,13 @@ export async function openForHuman(url: string) {
   // earlier dialog can leave it held, so hand it back before opening the page
   const control = await session.controlState().catch(() => undefined);
   if (control?.controller === "human") await computer.releaseControl(session.name);
-  await session.createTab(url);
+  // one page in front: old tabs from earlier opens would bury the issue behind them
+  for (const t of await session.listTabs()) {
+    if (!t.primary) await session.closeTab(t.targetId).catch(() => undefined);
+  }
+  const tab = await session.createTab(url);
+  await session.patchTab(tab.targetId, { active: true });
+  await session.focus().catch(() => undefined);
   await computer.takeControl(session.name);
   const delegation = await computer.delegateDesktop(session.name, { create: false });
   return { sessionName: session.name, delegation: delegation.toJSON() };
