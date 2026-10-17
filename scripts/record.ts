@@ -31,7 +31,7 @@ const context = await browser.newContext({
 });
 const page: Page = await context.newPage();
 await page.goto(`${base}/?theme=dark`, { waitUntil: "domcontentloaded" });
-await page.waitForSelector(".dotbtn");
+await page.waitForSelector(".rail__item");
 await sleep(2500);
 mark("open");
 
@@ -57,7 +57,7 @@ await until(
     const done = s.statuses.filter((x: any) => x.phase === "done" || x.phase === "failed").length;
     if (!marks.first_verdict && done > 0) mark("first_verdict");
     if (done < 19 && Date.now() - t0 > (i + 1) * 50_000 && i < tour.length) {
-      await page.locator(`.dotbtn[aria-label$="${tour[i++]}"]`).click().catch(() => undefined);
+      await page.locator(`.rail__item[aria-label$="${tour[i++]}"]`).click().catch(() => undefined);
     }
     return done === 19;
   },
@@ -67,7 +67,7 @@ mark("run_done");
 await sleep(2500);
 
 // the verdict that matters
-await page.locator('.dotbtn[aria-label$="#60172"]').click();
+await page.locator('.rail__item[aria-label$="#60172"]').click();
 await sleep(1500);
 mark("verdict_shown");
 await sleep(4000);

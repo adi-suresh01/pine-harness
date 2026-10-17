@@ -53,6 +53,5 @@ export function gpuLine(g: GpuRun | undefined): string | undefined {
   if (scores.length && typeof control === "number") {
     parts.push(`GSM8K ${Math.min(...scores).toFixed(2)} to ${Math.max(...scores).toFixed(2)} vs ${control.toFixed(2)}`);
   }
-  if (typeof g.spentUsd === "number") parts.push(`$${g.spentUsd.toFixed(2)}`);
   return parts.join(", ");
 }

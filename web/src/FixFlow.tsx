@@ -56,7 +56,8 @@ export function FixFlow({ issueKey, fix, stage }: Props) {
 
   return (
     <div className="fix">
-      {mine.summary && <p className="fix__summary">{tidy(mine.summary)}</p>}
+      {/* once the GPU has spoken, red and green say enough; the agent's own description waits behind the patch */}
+      {mine.summary && (!done || showPatch) && <p className="fix__summary">{tidy(mine.summary)}</p>}
       {(!!mine.sameAs || !!mine.openedPrs?.length) && (
         <p className="fix__note">
           {mine.sameAs ? `Same change as open PR ${mine.sameAs}.` : ""}

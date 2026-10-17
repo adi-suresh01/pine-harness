@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { GpuRun } from "../../server/gpu";
-import { score } from "../../server/score";
 import { getState, startRun, type AppState, type TimelineEvent, type TriageStatus } from "./api";
-import { Dots } from "./Dots";
 import { PostDialog } from "./PostDialog";
+import { Rail } from "./Rail";
 import { Stage } from "./Stage";
 
 function useNow(ticking: boolean) {
@@ -109,7 +108,6 @@ export function App() {
 
   if (!state) return <main className="boot">{error || "Loading"}</main>;
 
-  const sc = score(issues, state.statuses);
   // any run, not just the one on screen: a second run would take over the first one's Computers
   const anyLive = state.runs.some((r) => r.live);
   const focusKey = selected && issues.some((i) => i.key === selected) ? selected : issues[0]?.key;
@@ -120,15 +118,11 @@ export function App() {
       <header className="top">
         <h1>Triage swarm</h1>
         <div className="top__right">
-          {sc.scored > 0 && (
-            <span className="top__score">
-              <b>
-                {sc.matched}/{sc.scored}
-              </b>{" "}
-              match my hand triage
-            </span>
-          )}
-          {run && <span className="top__clock">{clock((run.endedAt ? Date.parse(run.endedAt) : now) - Date.parse(run.startedAt))}</span>}
+          <button className="link" onClick={() => setPosting({ url: "https://github.com/login", draft: "" })}>
+            GitHub desktop
+          </button>
+          {/* a ticking clock while the agents work; a finished run doesn't need one */}
+          {run?.live && <span className="top__clock">{clock(now - Date.parse(run.startedAt))}</span>}
           {state.runs.length > 1 && (
             <select className="top__run" value={run?.runId} onChange={(e) => setRunId(e.target.value)} aria-label="Run">
               {state.runs.map((r) => (
@@ -140,7 +134,7 @@ export function App() {
             </select>
           )}
           <button
-            className="btn"
+            className="btn btn--quiet"
             disabled={anyLive}
             onClick={() =>
               startRun()
@@ -162,6 +156,8 @@ export function App() {
         </p>
       )}
 
+      <Rail issues={issues} byKey={byKey} selected={focusKey} onSelect={setSelected} />
+
       {focus && run ? (
         <Stage
           issue={focus}
@@ -179,13 +175,6 @@ export function App() {
       ) : (
         <p className="screen__empty">Run the agents to give every issue its own Pine Computer.</p>
       )}
-
-      <footer className="foot">
-        <Dots issues={issues} byKey={byKey} selected={focusKey} onSelect={setSelected} />
-        <button className="link foot__link" onClick={() => setPosting({ url: "https://github.com/login", draft: "" })}>
-          GitHub desktop
-        </button>
-      </footer>
 
       {posting && <PostDialog url={posting.url} draft={posting.draft} onClose={() => setPosting(undefined)} />}
     </div>

@@ -59,7 +59,6 @@ export function Stage({ issue, status, runId, live, gpu, stage, fix, fixable, fi
   const done = status?.phase === "done" && status.verdict;
   const cat = done ? (status.verified?.categoryOut ?? status.verdict!.category) : undefined;
   const draft = done ? (reviewed ?? status.verdict!.draft_comment) : "";
-  const gt = issue.groundTruth;
   const g = gpuLine(gpu);
 
   return (
@@ -71,10 +70,7 @@ export function Stage({ issue, status, runId, live, gpu, stage, fix, fixable, fi
         ) : running ? (
           <LiveDesktop key={`${runId}/${issue.key}`} delegate={delegate} desktopKey={`${runId}/${issue.key}`} />
         ) : lastFrame ? (
-          <>
-            <img src={frameUrl(runId, issue.key, lastFrame)} alt={shown.label} />
-            <span className="screen__label">{shown.label}</span>
-          </>
+          <img src={frameUrl(runId, issue.key, lastFrame)} alt={shown.note ?? `The agent reading #${issue.number}`} />
         ) : (
           <p className="screen__empty">{status ? "Starting its Computer" : "Not started"}</p>
         )}
@@ -84,24 +80,17 @@ export function Stage({ issue, status, runId, live, gpu, stage, fix, fixable, fi
         <a className="caption__ref" href={issue.url} target="_blank" rel="noreferrer">
           {issue.repo.startsWith("vllm") ? "vLLM" : "SGLang"} #{issue.number}
         </a>
-        <span className="caption__title">{issue.title.replace(/^\[[^\]]+\]:?\s*/, "")}</span>
-        <span className="caption__now">
-          {fixing ? (
-            <>
-              <span className="pulse" aria-hidden /> Fixing: {fixStep ?? "starting"}
-            </>
-          ) : running && lastStep ? (
-            <>
-              <span className="pulse" aria-hidden /> {lastStep}
-            </>
-          ) : done ? (
-            `${duration(status)}${status.costUsd ? `, $${status.costUsd.toFixed(2)}` : ""}`
-          ) : status?.phase === "failed" ? (
-            "no verdict"
-          ) : (
-            ""
-          )}
-        </span>
+        {fixing ? (
+          <span className="caption__now">
+            <span className="pulse" aria-hidden /> Fixing: {fixStep ?? "starting"}
+          </span>
+        ) : running && lastStep ? (
+          <span className="caption__now">
+            <span className="pulse" aria-hidden /> {lastStep}
+          </span>
+        ) : (
+          shown.note && !running && <span className="caption__now">{shown.note}</span>
+        )}
       </p>
       </div>
 
@@ -109,11 +98,7 @@ export function Stage({ issue, status, runId, live, gpu, stage, fix, fixable, fi
         <div className={`verdict cat-${cat}`}>
           <h2>{headline(status)}</h2>
           <p className="verdict__why">{firstSentence(status.verdict!.summary)}</p>
-          <p className="verdict__meta">
-            {checkedLine(status)}.
-            {gt && gt.category !== cat && ` My hand triage said ${LOWER[gt.category]}.`}
-            {gt && gt.category === cat && " Matches my hand triage."}
-          </p>
+          <p className="verdict__meta">{checkedLine(status)}.</p>
           {g && <p className="verdict__gpu">{g}.</p>}
           {fixable && <FixFlow issueKey={issue.key} fix={fix} stage={stage} />}
           {draft && (
@@ -124,7 +109,7 @@ export function Stage({ issue, status, runId, live, gpu, stage, fix, fixable, fi
           <p className="verdict__more">
             {fixable && (
               <button
-                className="btn btn--quiet btn--small"
+                className="link"
                 disabled={fixBusy}
                 onClick={() => {
                   setFixError("");
@@ -139,7 +124,7 @@ export function Stage({ issue, status, runId, live, gpu, stage, fix, fixable, fi
             {/* the agent's repro plan is the input the harness turns into a kit; this shows it */}
             {cat === "needs_repro" && status.verdict!.repro_plan && (
               <button
-                className="btn btn--quiet btn--small"
+                className="link"
                 aria-expanded={open === "plan"}
                 onClick={() => setOpen(open === "plan" ? null : "plan")}
               >
@@ -148,7 +133,7 @@ export function Stage({ issue, status, runId, live, gpu, stage, fix, fixable, fi
             )}
             {/* a GPU-repro issue without a kit: the fix exists as a capability, but nothing could test the patch yet */}
             {!fixable && cat === "needs_repro" && (
-              <button className="btn btn--quiet btn--small" disabled title="Needs a GPU test kit in sm120-kit first. vllm#60172 has one.">
+              <button className="link" disabled title="Needs a GPU test kit in sm120-kit first. vllm#60172 has one.">
                 Fix issue
               </button>
             )}
@@ -160,9 +145,6 @@ export function Stage({ issue, status, runId, live, gpu, stage, fix, fixable, fi
             </button>
             </p>
           {fixError && <p className="fix__error">{fixError}</p>}
-          {!fixable && cat === "needs_repro" && open !== "plan" && (
-            <p className="verdict__meta">Fixing this one needs a GPU test kit first. #60172 has one.</p>
-          )}
           {open === "plan" && status.verdict!.repro_plan && (
             <div className="plan">
               <p className="plan__head">
@@ -196,7 +178,7 @@ export function Stage({ issue, status, runId, live, gpu, stage, fix, fixable, fi
       {!done && (
         <div className="verdict verdict--pending">
           <h2>{status?.phase === "failed" ? "No verdict" : status ? "Reading the thread" : "Waiting to start"}</h2>
-          <p className="verdict__meta">{status?.phase === "failed" ? status.error : "The verdict lands here, with every link it cites checked against GitHub."}</p>
+          {status?.phase === "failed" && <p className="verdict__meta">{status.error}</p>}
         </div>
       )}
     </section>
@@ -213,31 +195,17 @@ function stepText(a: TimelineEvent["activity"]): string | undefined {
   return t.length > 90 ? `${t.slice(0, 88)}...` : t;
 }
 
-const LOWER: Record<string, string> = {
-  already_fixed: "already fixed",
-  needs_repro: "needs a GPU repro",
-  needs_info: "needs info",
-  duplicate: "duplicate",
-  not_a_bug: "not a bug",
-};
-
-/** The newest screenshot of the issue's own page, else the newest screenshot of anything, with a label saying which. */
-function pickFrame(events: TimelineEvent[], number: number, fallback: string | undefined): { file?: string; label: string } {
+/** The newest screenshot of the issue's own page, else the newest of anything, with a note saying which page that is. */
+function pickFrame(events: TimelineEvent[], number: number, fallback: string | undefined): { file?: string; note?: string } {
   const pages = new Map<string, string>();
   for (const e of events) if (e.activity?.page) pages.set(e.activity.id, e.activity.page);
   const frames = events.filter((e) => e.frame);
   const pageOf = (e: TimelineEvent) => (e.frame?.activityId ? pages.get(e.frame.activityId) : undefined) ?? "";
   const own = [...frames].reverse().find((e) => new RegExp(`/(issues|pull)/${number}(\\b|$)`).test(pageOf(e)));
-  if (own) return { file: own.frame!.file, label: `The agent reading #${number}` };
+  if (own) return { file: own.frame!.file };
   const last = frames[frames.length - 1];
   const page = last ? pageOf(last) : "";
   const m = page.match(/github\.com\/[^/]+\/([^/]+)\/(issues|pull)\/(\d+)/);
   const where = m ? `${m[2] === "pull" ? "PR" : "issue"} ${m[1]}#${m[3]}` : "another page";
-  return { file: last?.frame?.file ?? fallback, label: `The agent's last screen: ${where}` };
-}
-
-function duration(s: TriageStatus): string {
-  if (!s.startedAt || !s.endedAt) return "";
-  const sec = Math.round((Date.parse(s.endedAt) - Date.parse(s.startedAt)) / 1000);
-  return `${Math.floor(sec / 60)}m ${String(sec % 60).padStart(2, "0")}s`;
+  return { file: last?.frame?.file ?? fallback, note: `Its last screen, ${where}` };
 }
