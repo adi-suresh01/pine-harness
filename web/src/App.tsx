@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { GpuRun } from "../../server/gpu";
 import { getState, startRun, type AppState, type TimelineEvent, type TriageStatus } from "./api";
+import { Picker } from "./Picker";
 import { PostDialog } from "./PostDialog";
-import { Rail } from "./Rail";
 import { Stage } from "./Stage";
 
 function useNow(ticking: boolean) {
@@ -156,8 +156,6 @@ export function App() {
         </p>
       )}
 
-      <Rail issues={issues} byKey={byKey} selected={focusKey} onSelect={setSelected} />
-
       {focus && run ? (
         <Stage
           issue={focus}
@@ -175,6 +173,10 @@ export function App() {
       ) : (
         <p className="screen__empty">Run the agents to give every issue its own Pine Computer.</p>
       )}
+
+      <footer className="foot">
+        <Picker issues={issues} byKey={byKey} selected={focusKey} onSelect={setSelected} />
+      </footer>
 
       {posting && <PostDialog url={posting.url} draft={posting.draft} onClose={() => setPosting(undefined)} />}
     </div>

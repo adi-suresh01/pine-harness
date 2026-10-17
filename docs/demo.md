@@ -7,7 +7,7 @@ part of the sentence, don't stop to explain them.
 
 1. Brave at http://localhost:3000, full screen (Cmd+Ctrl+F), pine theme. Second tab open on
    https://github.com/vllm-project/vllm/issues/60172, signed in as you.
-2. Click **Run 19 agents**, then wait about 2.5 minutes: verdicts start landing at about 2 minutes, so the numbers sort
+2. Click **Run 19 agents**, then wait about 2.5 minutes: verdicts start landing at about 2 minutes, so the count climbs
    while you record. (About $1.30 of agent time.)
 3. Cmd+Shift+5, Record Entire Screen, microphone on if you narrate live.
 4. The post at 0:58 is real and public. For a practice take, stop at GitHub's Comment button and click
@@ -15,7 +15,7 @@ part of the sentence, don't stop to explain them.
 
 ## The take
 
-**0:00, the live run.** Leave the screen on the agent that is working; the bars over the issue numbers fill in.
+**0:00, the live run.** Leave the screen on the agent that is working; the verdict count at the bottom climbs.
 
 > This week I fixed GPU serving bugs in vLLM and SGLang. Most of that time went into triage, not GPUs.
 > So I gave 19 open issues their own **Pine Computer**, each with its own **agent** in a real Chrome.
@@ -24,14 +24,14 @@ part of the sentence, don't stop to explain them.
 
 > Every run gets a **fresh session**, so no agent remembers another one's verdict.
 > That's the actual desktop, streamed in with Pine's **Web SDK**, and every step comes in on the **event stream**.
-> That's what colors the bars and sorts the numbers.
+> That's what moves the count at the bottom.
 
-**0:25, click a number whose bar just turned colored.**
+**0:25, open Issues at the bottom, click one that just got a verdict.**
 
 > Each verdict comes back as an **artifact**, and every link it cites is checked against GitHub before it shows up.
 > Across today's runs, 339 of 339 links checked out.
 
-**0:35, run picker to 3:33 PM, click 60172 under Duplicate.**
+**0:35, run picker to 3:33 PM, open Issues, click #60172 under Duplicate.**
 
 > This one is a duplicate I'd missed, with a fix PR I'd never seen.
 > A Pine agent got the issue and the exact vLLM source as **attachments** and wrote its own patch.
@@ -41,7 +41,7 @@ Point at **Fix issue**.
 
 > And this button does it again from scratch, live.
 
-**0:50, click a number under Needs a GPU, then Find root cause.**
+**0:50, open Issues, click one under Needs a GPU, then Find root cause.**
 
 > For the ones that need a GPU, the agent already wrote the experiment plan. My harness runs it once I approve the
 > price. Next, the agent writes the kit too.

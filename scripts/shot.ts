@@ -15,13 +15,14 @@ page.on("pageerror", (e) => errors.push(e.message));
 
 const theme = process.env.THEME ?? "light";
 await page.goto(`http://localhost:3000/?theme=${theme}`, { waitUntil: "domcontentloaded" });
-await page.waitForSelector(".rail__item", { timeout: 15_000 });
+await page.waitForSelector(".picker__btn", { timeout: 15_000 });
 await page.waitForTimeout(1500);
 await page.screenshot({ path: `${out}/1-overview-${w}-${theme}.png` });
 
 // the issue the demo opens on: GPU results and my reviewed comment
-const dup = page.locator('.rail__item[aria-label$="#60172"]');
+const dup = page.locator('.picker__item[aria-label$="#60172"]');
 if (await dup.count()) {
+  await page.click(".picker__btn");
   await dup.first().click();
   await page.waitForTimeout(1500);
   await page.screenshot({ path: `${out}/2-focus-60172-${w}-${theme}.png` });
@@ -29,8 +30,9 @@ if (await dup.count()) {
   await page.waitForTimeout(500);
   await page.screenshot({ path: `${out}/2b-comment-60172-${w}-${theme}.png` });
 }
-const fixed = page.locator('.rail__item[aria-label$="#55757"]');
+const fixed = page.locator('.picker__item[aria-label$="#55757"]');
 if (await fixed.count()) {
+  await page.click(".picker__btn");
   await fixed.first().click();
   await page.waitForTimeout(1200);
   await page.screenshot({ path: `${out}/3-focus-55757-${w}-${theme}.png` });

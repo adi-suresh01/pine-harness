@@ -21,7 +21,7 @@
   --s-17: 1.0625rem;
   --s-18: 1.125rem;
   --s-30: 1.875rem;
-  --side: 28px;
+  --side: clamp(24px, 3.6vw, 72px);
 }
 :root[data-theme="dark"] {
   --paper: #0c1512;
@@ -129,11 +129,10 @@ a {
 
 .app {
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr);
-  align-content: start;
+  grid-template-rows: auto minmax(0, 1fr) auto;
   height: 100%;
-  padding: 20px var(--side) 22px;
-  gap: 24px;
+  padding: clamp(20px, 3.5vh, 36px) var(--side);
+  gap: clamp(28px, 5vh, 48px);
 }
 
 /* header */
@@ -151,7 +150,7 @@ a {
 .top__right {
   display: flex;
   align-items: center;
-  gap: 24px;
+  gap: 28px;
   color: var(--soft);
 }
 .top__right .link {
@@ -178,8 +177,9 @@ a {
 /* stage: the agent's screen, and beside it what it decided */
 .stage {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 420px;
-  gap: 48px;
+  grid-template-columns: minmax(0, 1fr) 400px;
+  grid-template-rows: minmax(0, 1fr);
+  gap: clamp(40px, 5vw, 96px);
   align-items: start;
   min-height: 0;
 }
@@ -190,7 +190,7 @@ a {
 .screen {
   position: relative;
   width: 100%;
-  max-height: calc(100vh - 240px);
+  max-height: calc(100vh - 250px);
   aspect-ratio: 1911 / 954;
   background: var(--screen);
   border-radius: 10px;
@@ -236,7 +236,7 @@ a {
   justify-content: space-between;
   align-items: baseline;
   gap: 14px;
-  margin: 12px 1px 0;
+  margin: 14px 1px 0;
   min-width: 0;
 }
 .caption__ref {
@@ -270,7 +270,7 @@ a {
 
 /* verdict */
 .verdict {
-  max-height: calc(100vh - 200px);
+  max-height: 100%;
   overflow: auto;
   padding-top: 2px;
 }
@@ -286,19 +286,16 @@ a {
   color: var(--faint);
 }
 .verdict__why {
-  margin: 14px 0 0;
+  margin: 16px 0 0;
   font-size: var(--s-17);
   line-height: 1.5;
 }
 .verdict__meta {
-  margin: 14px 0 0;
+  margin: 16px 0 0;
   color: var(--soft);
 }
-.verdict__gpu {
-  margin: 10px 0 0;
-}
 .fix {
-  margin-top: 22px;
+  margin-top: 28px;
   display: grid;
   gap: 12px;
   justify-items: start;
@@ -404,7 +401,7 @@ a {
   font-size: var(--s-13);
 }
 .verdict__post {
-  margin-top: 26px;
+  margin-top: 32px;
 }
 .btn--small {
   padding: 0.35em 0.95em;
@@ -414,8 +411,8 @@ a {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px 20px;
-  margin: 18px 0 0;
+  gap: 10px 24px;
+  margin: 22px 0 0;
 }
 .plan {
   margin-top: 16px;
@@ -490,61 +487,99 @@ a {
   color: var(--cat-needs_repro);
 }
 
-/* the rail: every issue's number, grouped by verdict. The only color on the page lives in its bars. */
-.rail {
+/* the issue picker: one button at the foot of the page, opening upward into a column per verdict */
+.foot {
   display: flex;
-  flex-wrap: wrap;
-  gap: 12px clamp(18px, 2vw, 34px);
+  align-items: center;
 }
-.rail__label {
-  margin: 0 0 7px;
-  color: var(--soft);
-  font-size: var(--s-13);
-  white-space: nowrap;
-}
-.rail__items {
+.picker {
   display: flex;
-  flex-wrap: wrap;
-  gap: 10px 4px;
+  align-items: center;
+  gap: 18px;
 }
-.rail__item {
-  position: relative;
-  /* 19 numbers fit one line from a 1200px window up */
-  width: clamp(44px, 3.8vw, 62px);
-  padding: 9px 0 0;
-  border: 0;
-  background: none;
-  text-align: left;
+.picker__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
   font: inherit;
-  font-size: var(--s-13);
-  font-variant-numeric: tabular-nums;
-  color: var(--soft);
+  font-size: var(--s-14);
+  font-weight: 600;
+  color: var(--ink);
+  background: transparent;
+  border: 0;
+  border-radius: 7px;
+  box-shadow: inset 0 0 0 1px var(--faint);
+  padding: 0.6em 0.95em 0.6em 1.05em;
   cursor: pointer;
 }
-.rail__item::before {
-  content: "";
-  position: absolute;
-  inset: 0 0 auto 0;
-  height: 3px;
-  border-radius: 2px;
-  background: var(--cat);
-  transition: background 500ms ease, height 150ms ease;
+.picker__btn:hover {
+  box-shadow: inset 0 0 0 1px var(--soft);
 }
-.rail__group--open .rail__item::before {
-  background: var(--faint);
+.picker__count {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--soft);
+  font-size: var(--s-14);
+  font-variant-numeric: tabular-nums;
 }
-.rail__item:hover {
+/* left and bottom are set against the button in Picker.tsx when it opens */
+.picker__menu {
+  inset: auto;
+  margin: 0;
+  padding: 22px 26px 18px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--screen);
+  color: var(--ink);
+  box-shadow: 0 0 0 1px var(--hair), 0 18px 48px rgba(0, 0, 0, 0.35);
+  max-height: calc(100vh - 120px);
+  overflow: auto;
+}
+.picker__menu:popover-open {
+  display: flex;
+  gap: 44px;
+}
+.picker__label {
+  margin: 0 0 10px;
+  font-size: var(--s-13);
+  color: var(--cat, var(--soft));
+  white-space: nowrap;
+}
+.picker__group ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 2px;
+}
+.picker__item {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 3px 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: var(--s-15);
+  font-variant-numeric: tabular-nums;
+  color: var(--soft);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.picker__item:hover {
   color: var(--ink);
 }
-.rail__item.is-selected {
+.picker__item[aria-current="true"] {
   color: var(--ink);
   font-weight: 650;
 }
-.rail__item.is-selected::before {
-  height: 5px;
+.picker__repo {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--faint);
 }
 @media (prefers-reduced-motion: no-preference) {
-  .rail__item.is-working::before,
   .pulse {
     animation: breathe 1.4s ease-in-out infinite;
   }

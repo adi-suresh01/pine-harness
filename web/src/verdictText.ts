@@ -45,13 +45,8 @@ export function gpuLine(g: GpuRun | undefined): string | undefined {
   const fixes = g.variants.filter((v) => v.patched);
   const reproduced = base.some((v) => v.verdict && v.verdict !== "OK");
   const passed = fixes.filter((v) => v.verdict === "OK");
-  const scores = passed.map((v) => v.gsm8k).filter((x): x is number => typeof x === "number");
-  const control = base.find((v) => v.verdict === "OK")?.gsm8k;
   const gpu = g.gpu?.replace("NVIDIA ", "").replace(" Blackwell", "").replace(" Server Edition", "") ?? "GPU";
   const parts = [reproduced ? `Reproduced on 1x ${gpu}` : `Ran on 1x ${gpu}`];
   if (fixes.length) parts.push(`${passed.length} of ${fixes.length} fixes pass`);
-  if (scores.length && typeof control === "number") {
-    parts.push(`GSM8K ${Math.min(...scores).toFixed(2)} to ${Math.max(...scores).toFixed(2)} vs ${control.toFixed(2)}`);
-  }
   return parts.join(", ");
 }

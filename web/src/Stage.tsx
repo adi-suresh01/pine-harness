@@ -98,8 +98,9 @@ export function Stage({ issue, status, runId, live, gpu, stage, fix, fixable, fi
         <div className={`verdict cat-${cat}`}>
           <h2>{headline(status)}</h2>
           <p className="verdict__why">{firstSentence(status.verdict!.summary)}</p>
-          <p className="verdict__meta">{checkedLine(status)}.</p>
-          {g && <p className="verdict__gpu">{g}.</p>}
+          <p className="verdict__meta">
+            {checkedLine(status)}.{g && ` ${g}.`}
+          </p>
           {fixable && <FixFlow issueKey={issue.key} fix={fix} stage={stage} />}
           {draft && (
             <button className="btn verdict__post" onClick={() => onPost(draft)}>
