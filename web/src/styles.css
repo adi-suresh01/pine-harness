@@ -398,9 +398,14 @@ a {
 .verdict__post {
   margin-top: 26px;
 }
+.btn--small {
+  padding: 0.35em 0.95em;
+  font-size: var(--s-13);
+}
 .verdict__more {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 8px 22px;
   margin: 18px 0 0;
 }

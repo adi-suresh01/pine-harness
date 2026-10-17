@@ -25,6 +25,7 @@ export function Stage({ issue, status, runId, live, gpu, stage, fix, fixable, fi
   const [history, setHistory] = useState<TimelineEvent[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [open, setOpen] = useState<"comment" | "evidence" | null>(null);
+  const [fixError, setFixError] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -53,6 +54,7 @@ export function Stage({ issue, status, runId, live, gpu, stage, fix, fixable, fi
   // while a Pine agent writes the fix, the hero is its desktop
   const fixing = !!fix && fix.issueKey === issue.key && !!fix.sessionName && (fix.phase === "running" || fix.phase === "starting");
   const fixStep = stepText([...fixEvents].reverse().find((e) => e.activity)?.activity);
+  const fixBusy = !!fix && (fix.phase === "starting" || fix.phase === "running" || fix.phase === "checking");
 
   const done = status?.phase === "done" && status.verdict;
   const cat = done ? (status.verified?.categoryOut ?? status.verdict!.category) : undefined;
@@ -120,6 +122,20 @@ export function Stage({ issue, status, runId, live, gpu, stage, fix, fixable, fi
             </button>
           )}
           <p className="verdict__more">
+            {fixable && (
+              <button
+                className="btn btn--quiet btn--small"
+                disabled={fixBusy}
+                onClick={() => {
+                  setFixError("");
+                  fetch("/api/fix", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ issueKey: issue.key }) })
+                    .then(async (r) => (r.ok ? undefined : setFixError((await r.json()).error ?? "could not start the fix")))
+                    .catch((e: Error) => setFixError(e.message));
+                }}
+              >
+                {fixBusy ? "Fixing" : "Fix issue"}
+              </button>
+            )}
             <button className="link" aria-expanded={open === "comment"} onClick={() => setOpen(open === "comment" ? null : "comment")}>
               {reviewed ? "My comment" : "Draft comment"}
             </button>
@@ -127,6 +143,7 @@ export function Stage({ issue, status, runId, live, gpu, stage, fix, fixable, fi
               Evidence
             </button>
             </p>
+          {fixError && <p className="fix__error">{fixError}</p>}
           {open === "comment" && <Prose text={draft} />}
           {open === "evidence" && (
             <ul className="evidence">

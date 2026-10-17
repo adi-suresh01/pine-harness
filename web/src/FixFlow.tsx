@@ -30,18 +30,11 @@ export function FixFlow({ issueKey, fix, stage }: Props) {
   const mine = fix && fix.issueKey === issueKey ? fix : null;
   const working = mine && (mine.phase === "starting" || mine.phase === "running" || mine.phase === "checking");
 
-  const ask = () => {
-    setError("");
-    post("/api/fix", { issueKey }).catch((e: Error) => setError(e.message));
-  };
-
-  if (!mine || mine.phase === "failed") {
+  if (!mine) return null;
+  if (mine.phase === "failed") {
     return (
       <div className="fix">
-        <button className="btn btn--quiet" onClick={ask}>
-          {mine ? "Ask again" : "Ask a Pine agent to fix it"}
-        </button>
-        {(error || mine?.error) && <p className="fix__error">{error || mine?.error}</p>}
+        <p className="fix__error">The fix did not finish: {mine.error}</p>
       </div>
     );
   }
@@ -107,11 +100,6 @@ export function FixFlow({ issueKey, fix, stage }: Props) {
             )}
           </p>
           {showPatch && <Diff text={mine.patch ?? ""} />}
-          <p>
-            <button className="btn btn--quiet" onClick={ask}>
-              Fix it again, live
-            </button>
-          </p>
         </>
       ) : running ? (
         <p className="fix__line">
