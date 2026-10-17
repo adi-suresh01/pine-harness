@@ -13,6 +13,8 @@ export interface AppState {
   run: Run | null;
   statuses: TriageStatus[];
   score: Score;
+  /** comments I reviewed and edited, by issue key; these win over the agent's draft */
+  reviewed: Record<string, string>;
 }
 
 export const CATEGORY_LABEL: Record<Category, string> = {

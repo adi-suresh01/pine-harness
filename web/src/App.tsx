@@ -147,10 +147,8 @@ export function App() {
               <VerdictCard
                 issue={focusIssue}
                 status={byKey.get(focusIssue.key)}
-                onPost={() => {
-                  const v = byKey.get(focusIssue.key)?.verdict;
-                  if (v) setPosting({ url: focusIssue.url, draft: v.draft_comment });
-                }}
+                reviewed={state.reviewed?.[focusIssue.key]}
+                onPost={(draft) => setPosting({ url: focusIssue.url, draft })}
               />
             </>
           ) : (

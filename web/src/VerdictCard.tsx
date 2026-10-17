@@ -2,7 +2,14 @@ import { CATEGORY_LABEL, type Issue, type TriageStatus } from "./api";
 
 const CHECK_TEXT = { ok: "Checked", failed: "Did not check out", unverified: "Not checkable" } as const;
 
-export function VerdictCard({ issue, status, onPost }: { issue: Issue; status: TriageStatus | undefined; onPost: () => void }) {
+interface Props {
+  issue: Issue;
+  status: TriageStatus | undefined;
+  reviewed: string | undefined;
+  onPost: (draft: string) => void;
+}
+
+export function VerdictCard({ issue, status, reviewed, onPost }: Props) {
   if (!status || status.phase !== "done" || !status.verdict) {
     return (
       <section className="verdict verdict--empty">
@@ -39,10 +46,11 @@ export function VerdictCard({ issue, status, onPost }: { issue: Issue; status: T
           ))}
         </ul>
       )}
-      {v.draft_comment && (
+      {(reviewed || v.draft_comment) && (
         <div className="draft">
-          <p className="draft__text">{v.draft_comment}</p>
-          <button className="btn" onClick={onPost}>
+          <p className="draft__label">{reviewed ? "My reviewed comment, with the GPU results" : "The agent's draft comment"}</p>
+          <p className="draft__text">{reviewed ?? v.draft_comment}</p>
+          <button className="btn" onClick={() => onPost(reviewed ?? v.draft_comment)}>
             Review and post
           </button>
         </div>

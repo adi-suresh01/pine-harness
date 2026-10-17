@@ -40,6 +40,16 @@ function safeFile(root: string, rel: string): string | undefined {
   return p.startsWith(root + "/") ? p : undefined;
 }
 
+// drafts/<issue>.md is a comment I reviewed and edited (for example with GPU numbers); it wins over the agent's draft
+async function reviewedDrafts(keys: string[]): Promise<Record<string, string>> {
+  const out: Record<string, string> = {};
+  for (const k of keys) {
+    const f = Bun.file(join(ROOT, "drafts", `${k}.md`));
+    if (await f.exists()) out[k] = (await f.text()).trim();
+  }
+  return out;
+}
+
 async function state(runId?: string) {
   const backlog = await loadBacklog();
   const runs = await listRuns();
@@ -51,6 +61,7 @@ async function state(runId?: string) {
     run: run ? { ...run, live: isLive(run.runId) } : null,
     statuses,
     score: score(backlog, statuses),
+    reviewed: await reviewedDrafts(backlog.map((i) => i.key)),
   };
 }
 
