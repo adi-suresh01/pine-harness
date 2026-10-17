@@ -24,3 +24,6 @@ GEMINI.md
 .claude/
 .mcp.json
 docs/superpowers/
+
+# gated Pine docs and SDK saved from the beta console
+vendor/
