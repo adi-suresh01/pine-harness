@@ -27,3 +27,6 @@ docs/superpowers/
 
 # gated Pine docs and SDK saved from the beta console
 vendor/
+
+# Pine Computer keys, bindings and session tokens
+state/

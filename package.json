@@ -1,0 +1,27 @@
+{
+  "name": "pine-harness",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "server": "bun run server/index.ts",
+    "web": "vite --config web/vite.config.ts",
+    "build": "vite build --config web/vite.config.ts",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit -p ."
+  },
+  "dependencies": {
+    "@pinesandbox/computer": "0.3.3",
+    "@pinesandbox/computer-web": "0.3.7",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.4.3",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.2",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.4"
+  }
+}
