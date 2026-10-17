@@ -23,13 +23,19 @@ interface Props {
 
 export function Stage({ issue, status, runId, live, gpu, stage, fix, fixable, fixEvents, reviewed, onPost }: Props) {
   const [history, setHistory] = useState<TimelineEvent[]>([]);
+  const [loaded, setLoaded] = useState(false);
   const [open, setOpen] = useState<"comment" | "evidence" | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     setHistory([]);
+    setLoaded(false);
     setOpen(null);
-    loadTimeline(runId, issue.key).then((h) => !cancelled && setHistory(h));
+    loadTimeline(runId, issue.key).then((h) => {
+      if (cancelled) return;
+      setHistory(h);
+      setLoaded(true);
+    });
     return () => {
       cancelled = true;
     };
@@ -39,7 +45,10 @@ export function Stage({ issue, status, runId, live, gpu, stage, fix, fixable, fi
   const seen = new Set(history.map((e) => e.eventId));
   const events = [...history, ...live.filter((e) => !seen.has(e.eventId))];
   const running = status?.phase === "running" && !!status.sessionName;
-  const lastFrame = [...events].reverse().find((e) => e.frame)?.frame?.file ?? status?.lastFrame;
+  // An agent usually ends on some other page (a release, a related PR), so a finished one shows its own issue as it
+  // read it, labeled, instead of whatever it looked at last.
+  const shown = pickFrame(events, issue.number, status?.lastFrame);
+  const lastFrame = loaded || running ? shown.file : undefined;
   const lastStep = stepText([...events].reverse().find((e) => e.activity)?.activity);
   // while a Pine agent writes the fix, the hero is its desktop
   const fixing = !!fix && fix.issueKey === issue.key && !!fix.sessionName && (fix.phase === "running" || fix.phase === "starting");
@@ -60,7 +69,10 @@ export function Stage({ issue, status, runId, live, gpu, stage, fix, fixable, fi
         ) : running ? (
           <LiveDesktop key={`${runId}/${issue.key}`} delegate={delegate} desktopKey={`${runId}/${issue.key}`} />
         ) : lastFrame ? (
-          <img src={frameUrl(runId, issue.key, lastFrame)} alt="The agent's last screen" />
+          <>
+            <img src={frameUrl(runId, issue.key, lastFrame)} alt={shown.label} />
+            <span className="screen__label">{shown.label}</span>
+          </>
         ) : (
           <p className="screen__empty">{status ? "Starting its Computer" : "Not started"}</p>
         )}
@@ -157,6 +169,21 @@ const LOWER: Record<string, string> = {
   duplicate: "duplicate",
   not_a_bug: "not a bug",
 };
+
+/** The newest screenshot of the issue's own page, else the newest screenshot of anything, with a label saying which. */
+function pickFrame(events: TimelineEvent[], number: number, fallback: string | undefined): { file?: string; label: string } {
+  const pages = new Map<string, string>();
+  for (const e of events) if (e.activity?.page) pages.set(e.activity.id, e.activity.page);
+  const frames = events.filter((e) => e.frame);
+  const pageOf = (e: TimelineEvent) => (e.frame?.activityId ? pages.get(e.frame.activityId) : undefined) ?? "";
+  const own = [...frames].reverse().find((e) => new RegExp(`/(issues|pull)/${number}(\\b|$)`).test(pageOf(e)));
+  if (own) return { file: own.frame!.file, label: `The agent reading #${number}` };
+  const last = frames[frames.length - 1];
+  const page = last ? pageOf(last) : "";
+  const m = page.match(/github\.com\/[^/]+\/([^/]+)\/(issues|pull)\/(\d+)/);
+  const where = m ? `${m[2] === "pull" ? "PR" : "issue"} ${m[1]}#${m[3]}` : "another page";
+  return { file: last?.frame?.file ?? fallback, label: `The agent's last screen: ${where}` };
+}
 
 function duration(s: TriageStatus): string {
   if (!s.startedAt || !s.endedAt) return "";

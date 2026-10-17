@@ -186,6 +186,16 @@ a {
   object-fit: contain;
   display: block;
 }
+.screen__label {
+  position: absolute;
+  left: 14px;
+  bottom: 14px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(12, 21, 18, 0.82);
+  color: #e6ede8;
+  font-size: var(--s-13);
+}
 .screen__empty {
   display: grid;
   place-items: center;
