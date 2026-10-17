@@ -16,12 +16,13 @@ interface Props {
   onSelect: (key: string) => void;
 }
 
-/** The issue list, folded into one button at the foot of the page. It opens upward, one column per verdict. */
+/** The issue list, folded into one label at the foot of the page. Hover or focus opens it upward, one column per verdict. */
 export function Picker({ issues, byKey, selected, onSelect }: Props) {
   const menu = useRef<HTMLDivElement>(null);
   const button = useRef<HTMLButtonElement>(null);
+  const closing = useRef<ReturnType<typeof setTimeout>>(undefined);
 
-  // the menu lives in the top layer, so it is placed against the button each time it opens
+  // the menu lives in the top layer, so it is placed against the label each time it opens
   useEffect(() => {
     const m = menu.current;
     if (!m) return;
@@ -32,8 +33,25 @@ export function Picker({ issues, byKey, selected, onSelect }: Props) {
       m.style.bottom = `${window.innerHeight - r.top + 10}px`;
     };
     m.addEventListener("beforetoggle", place);
-    return () => m.removeEventListener("beforetoggle", place);
+    return () => {
+      m.removeEventListener("beforetoggle", place);
+      clearTimeout(closing.current);
+    };
   }, []);
+
+  const show = () => {
+    clearTimeout(closing.current);
+    const m = menu.current;
+    if (m && !m.matches(":popover-open")) m.showPopover();
+  };
+  // a short grace period, so the pointer can cross the gap between the label and the menu
+  const hide = () => {
+    clearTimeout(closing.current);
+    closing.current = setTimeout(() => {
+      const m = menu.current;
+      if (m?.matches(":popover-open")) m.hidePopover();
+    }, 180);
+  };
 
   const groups = CATEGORY_ORDER.map((c) => ({
     cat: c as Category | "open",
@@ -49,8 +67,18 @@ export function Picker({ issues, byKey, selected, onSelect }: Props) {
   const done = issues.length - open.length;
 
   return (
-    <div className="picker">
-      <button ref={button} className="picker__btn" popoverTarget="issue-menu" aria-haspopup="true">
+    <div
+      className="picker"
+      onMouseEnter={show}
+      onMouseLeave={hide}
+      onKeyDown={(e) => {
+        if (e.key !== "Escape") return;
+        clearTimeout(closing.current);
+        if (menu.current?.matches(":popover-open")) menu.current.hidePopover();
+      }}
+      onBlur={(e) => !e.currentTarget.contains(e.relatedTarget as Node | null) && hide()}
+    >
+      <button ref={button} className="picker__btn" onFocus={show} onClick={show} aria-haspopup="true" aria-controls="issue-menu">
         Issues
         <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden>
           <path d="M2 6.5 5 3.5 8 6.5" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
@@ -60,7 +88,7 @@ export function Picker({ issues, byKey, selected, onSelect }: Props) {
         {working && <span className="pulse" aria-hidden />}
         {done} of {issues.length} verdicts in
       </span>
-      <div ref={menu} id="issue-menu" popover="auto" className="picker__menu" aria-label="Issues by verdict">
+      <div ref={menu} id="issue-menu" popover="manual" className="picker__menu" aria-label="Issues by verdict">
         {groups.map((g) => (
           <section key={g.cat} className={`picker__group ${g.cat === "open" ? "picker__group--open" : `cat-${g.cat}`}`}>
             <p className="picker__label">{g.cat === "open" ? openLabel : GROUP[g.cat]}</p>

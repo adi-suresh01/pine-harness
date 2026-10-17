@@ -26,12 +26,12 @@ part of the sentence, don't stop to explain them.
 > That's the actual desktop, streamed in with Pine's **Web SDK**, and every step comes in on the **event stream**.
 > That's what moves the count at the bottom.
 
-**0:25, open Issues at the bottom, click one that just got a verdict.**
+**0:25, hover Issues at the bottom, click one that just got a verdict.**
 
 > Each verdict comes back as an **artifact**, and every link it cites is checked against GitHub before it shows up.
 > Across today's runs, 339 of 339 links checked out.
 
-**0:35, run picker to 3:33 PM, open Issues, click #60172 under Duplicate.**
+**0:35, run picker to 3:33 PM, hover Issues, click #60172 under Duplicate.**
 
 > This one is a duplicate I'd missed, with a fix PR I'd never seen.
 > A Pine agent got the issue and the exact vLLM source as **attachments** and wrote its own patch.
@@ -41,7 +41,7 @@ Point at **Fix issue**.
 
 > And this button does it again from scratch, live.
 
-**0:50, open Issues, click one under Needs a GPU, then Find root cause.**
+**0:50, hover Issues, click one under Needs a GPU, then Find root cause.**
 
 > For the ones that need a GPU, the agent already wrote the experiment plan. My harness runs it once I approve the
 > price. Next, the agent writes the kit too.
