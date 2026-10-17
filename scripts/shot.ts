@@ -14,18 +14,21 @@ page.on("console", (m) => m.type() === "error" && errors.push(m.text()));
 page.on("pageerror", (e) => errors.push(e.message));
 
 await page.goto("http://localhost:3000/", { waitUntil: "domcontentloaded" });
-await page.waitForSelector(".tile", { timeout: 15_000 });
+await page.waitForSelector(".row", { timeout: 15_000 });
 await page.waitForTimeout(1500);
 await page.screenshot({ path: `${out}/1-overview-${w}.png` });
 
-// the tile the demo opens on: the one with the GPU results and my reviewed comment
-const tile = page.locator(".tile", { hasText: "#60172" });
-if (await tile.count()) {
-  await tile.first().click();
+// the issue the demo opens on: GPU results and my reviewed comment
+const dup = page.locator(".row", { hasText: "60172" });
+if (await dup.count()) {
+  await dup.first().click();
   await page.waitForTimeout(1500);
   await page.screenshot({ path: `${out}/2-focus-60172-${w}.png` });
+  await page.locator(".link", { hasText: "My comment" }).first().click().catch(() => undefined);
+  await page.waitForTimeout(500);
+  await page.screenshot({ path: `${out}/2b-comment-60172-${w}.png` });
 }
-const fixed = page.locator(".tile", { hasText: "#55757" });
+const fixed = page.locator(".row", { hasText: "55757" });
 if (await fixed.count()) {
   await fixed.first().click();
   await page.waitForTimeout(1200);

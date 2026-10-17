@@ -1,27 +1,45 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import type { GpuRun } from "../../server/gpu";
 import { score } from "../../server/score";
 import { getState, startRun, type AppState, type TimelineEvent, type TriageStatus } from "./api";
-import { Focus } from "./Focus";
-import { GpuPanel } from "./GpuPanel";
+import { Bar } from "./Bar";
+import { IssueList } from "./IssueList";
 import { PostDialog } from "./PostDialog";
-import { SortBar } from "./SortBar";
-import { Tile } from "./Tile";
-import { VerdictCard } from "./VerdictCard";
+import { Stage } from "./Stage";
 
-function useClock(running: boolean) {
+function useNow(ticking: boolean) {
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
-    if (!running) return;
+    if (!ticking) return;
     const t = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(t);
-  }, [running]);
+  }, [ticking]);
   return now;
 }
 
-function elapsed(fromIso: string, to: number): string {
-  const s = Math.max(0, Math.round((to - Date.parse(fromIso)) / 1000));
-  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+function useGpu(): GpuRun[] {
+  const [runs, setRuns] = useState<GpuRun[]>([]);
+  useEffect(() => {
+    let alive = true;
+    const load = () =>
+      fetch("/api/gpu")
+        .then((r) => (r.ok ? r.json() : []))
+        .then((r: GpuRun[]) => alive && setRuns(r))
+        .catch(() => undefined);
+    void load();
+    const t = setInterval(load, 10_000);
+    return () => {
+      alive = false;
+      clearInterval(t);
+    };
+  }, []);
+  return runs;
 }
+
+const clock = (ms: number) => {
+  const s = Math.max(0, Math.round(ms / 1000));
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+};
 
 export function App() {
   const [state, setState] = useState<AppState>();
@@ -30,6 +48,7 @@ export function App() {
   const [liveEvents, setLiveEvents] = useState<Record<string, TimelineEvent[]>>({});
   const [posting, setPosting] = useState<{ url: string; draft: string }>();
   const [error, setError] = useState("");
+  const gpu = useGpu();
 
   const refresh = useCallback(() => getState(runId).then(setState).catch((e: Error) => setError(e.message)), [runId]);
   useEffect(() => void refresh(), [refresh]);
@@ -38,64 +57,54 @@ export function App() {
     const es = new EventSource("/api/stream");
     es.addEventListener("status", (e) => {
       const s = JSON.parse((e as MessageEvent).data) as TriageStatus;
-      setState((prev) => {
-        if (!prev?.run || prev.run.runId !== s.runId) return prev;
-        const statuses = prev.statuses.filter((x) => x.issueKey !== s.issueKey).concat(s);
-        return { ...prev, statuses };
-      });
+      setState((prev) =>
+        prev?.run && prev.run.runId === s.runId ? { ...prev, statuses: prev.statuses.filter((x) => x.issueKey !== s.issueKey).concat(s) } : prev,
+      );
     });
     es.addEventListener("event", (e) => {
       const { runId: r, issueKey, event } = JSON.parse((e as MessageEvent).data) as { runId: string; issueKey: string; event: TimelineEvent };
-      setLiveEvents((prev) => ({ ...prev, [`${r}/${issueKey}`]: [...(prev[`${r}/${issueKey}`] ?? []).slice(-200), event] }));
+      const k = `${r}/${issueKey}`;
+      setLiveEvents((prev) => ({ ...prev, [k]: [...(prev[k] ?? []).slice(-200), event] }));
     });
     es.addEventListener("run", () => void refresh());
-    // the stream reconnects on its own; anything sent while it was down only shows up in a fresh read
+    // the stream reconnects on its own; whatever happened while it was down only shows in a fresh read
     es.addEventListener("hello", () => void refresh());
     return () => es.close();
   }, [refresh]);
 
   const run = state?.run ?? null;
-  const now = useClock(!!run?.live);
+  const now = useNow(!!run?.live);
   const byKey = useMemo(() => new Map(state?.statuses.map((s) => [s.issueKey, s]) ?? []), [state?.statuses]);
-  const issues = useMemo(
-    () => (state ? (run ? state.backlog.filter((i) => run.issueKeys.includes(i.key)) : state.backlog) : []),
-    [state, run],
-  );
-  const sc = state ? score(issues, state.statuses) : undefined;
-  const focusKey = selected ?? issues[0]?.key;
-  const focusIssue = issues.find((i) => i.key === focusKey);
+  const issues = useMemo(() => (state ? (run ? state.backlog.filter((i) => run.issueKeys.includes(i.key)) : state.backlog) : []), [state, run]);
 
-  if (!state) return <main className="boot">{error || "Loading the backlog"}</main>;
+  if (!state) return <main className="boot">{error || "Loading"}</main>;
+
+  const sc = score(issues, state.statuses);
   // any run, not just the one on screen: a second run would take over the first one's Computers
   const anyLive = state.runs.some((r) => r.live);
+  const focusKey = selected && issues.some((i) => i.key === selected) ? selected : issues[0]?.key;
+  const focus = issues.find((i) => i.key === focusKey);
 
   return (
     <div className="app">
       <header className="top">
-        <div className="top__title">
-          <h1>Triage swarm</h1>
-          <p>
-            {issues.length} open sm_120 issues in vLLM and SGLang, one Pine Computer each. Only the ones that need a GPU go to
-            my repro harness.
-          </p>
-        </div>
-        <div className="top__run">
-          {run && (
-            <span className="top__clock" aria-label="Elapsed">
-              {elapsed(run.startedAt, run.endedAt ? Date.parse(run.endedAt) : now)}
-            </span>
-          )}
-          {sc && sc.scored > 0 && (
+        <h1>Triage swarm</h1>
+        <div className="top__right">
+          {sc.scored > 0 && (
             <span className="top__score">
-              Matches my hand triage on {sc.matched} of {sc.scored}
+              <b>
+                {sc.matched}/{sc.scored}
+              </b>{" "}
+              match my hand triage
             </span>
           )}
+          {run && <span className="top__clock">{clock((run.endedAt ? Date.parse(run.endedAt) : now) - Date.parse(run.startedAt))}</span>}
           {state.runs.length > 1 && (
-            <select value={run?.runId} onChange={(e) => setRunId(e.target.value)} aria-label="Run">
+            <select className="top__run" value={run?.runId} onChange={(e) => setRunId(e.target.value)} aria-label="Run">
               {state.runs.map((r) => (
                 <option key={r.runId} value={r.runId}>
-                  Run at {new Date(r.startedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
-                  {r.live ? " (running)" : ""}
+                  {new Date(r.startedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
+                  {r.live ? ", running" : ""}
                 </option>
               ))}
             </select>
@@ -109,53 +118,43 @@ export function App() {
                 .catch((e: Error) => setError(e.message))
             }
           >
-            {anyLive ? "Triaging" : `Triage all ${state.backlog.length}`}
-          </button>
-          <button className="link" onClick={() => setPosting({ url: "https://github.com/login", draft: "" })}>
-            My GitHub desktop
+            {anyLive ? "Agents working" : `Run ${state.backlog.length} agents`}
           </button>
         </div>
       </header>
+
+      <Bar statuses={state.statuses} total={issues.length} />
       {error && (
         <p className="error" role="alert">
-          {error} <button className="link" onClick={() => setError("")}>Dismiss</button>
+          {error}{" "}
+          <button className="link" onClick={() => setError("")}>
+            Dismiss
+          </button>
         </p>
       )}
 
-      <SortBar statuses={state.statuses} total={issues.length} />
-
       <main className="floor">
-        <div className="left">
-          <div className="grid">
-            {issues.map((issue) => (
-              <Tile
-                key={issue.key}
-                issue={issue}
-                status={byKey.get(issue.key)}
-                runId={run?.runId}
-                selected={issue.key === focusKey}
-                onSelect={() => setSelected(issue.key)}
-              />
-            ))}
-          </div>
-          <GpuPanel />
-        </div>
-        <div className="side">
-          {focusIssue && run ? (
-            <>
-              <Focus issue={focusIssue} status={byKey.get(focusIssue.key)} runId={run.runId} live={liveEvents[`${run.runId}/${focusIssue.key}`] ?? []} />
-              <VerdictCard
-                issue={focusIssue}
-                status={byKey.get(focusIssue.key)}
-                reviewed={state.reviewed?.[focusIssue.key]}
-                onPost={(draft) => setPosting({ url: focusIssue.url, draft })}
-              />
-            </>
-          ) : (
-            <section className="verdict verdict--empty">Start a run to give every issue its own Computer and agent.</section>
-          )}
-        </div>
+        <IssueList issues={issues} byKey={byKey} selected={focusKey} onSelect={setSelected} />
+        {focus && run ? (
+          <Stage
+            issue={focus}
+            status={byKey.get(focus.key)}
+            runId={run.runId}
+            live={liveEvents[`${run.runId}/${focus.key}`] ?? []}
+            gpu={gpu.find((g) => g.issueKey === focus.key && g.kitReady)}
+            reviewed={state.reviewed?.[focus.key]}
+            onPost={(draft) => setPosting({ url: focus.url, draft })}
+          />
+        ) : (
+          <p className="screen__empty">Run the agents to give every issue its own Pine Computer.</p>
+        )}
       </main>
+
+      <footer className="foot">
+        <button className="link" onClick={() => setPosting({ url: "https://github.com/login", draft: "" })}>
+          My GitHub desktop
+        </button>
+      </footer>
 
       {posting && <PostDialog url={posting.url} draft={posting.draft} onClose={() => setPosting(undefined)} />}
     </div>

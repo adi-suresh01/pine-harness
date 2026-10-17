@@ -8,6 +8,8 @@ const KIT = process.env.SM120_KIT ?? join(homedir(), "Desktop", "sm120-kit");
 
 export interface GpuVariant {
   name: string;
+  /** true when the variant applied a fix PR */
+  patched?: boolean;
   phase?: string;
   verdict?: string;
   bootS?: number;
@@ -60,7 +62,7 @@ export async function gpuRun(issueKey: string): Promise<GpuRun> {
     else if (e.kind === "ready" || e.kind === "setup") run.podState = "setup";
     else if (e.kind === "variant_start") {
       run.podState = "running";
-      variant(e.variant).phase = "starting";
+      Object.assign(variant(e.variant), { phase: "starting", patched: Array.isArray(e.patches) && e.patches.length > 0 });
     } else if (e.kind === "phase" && e.variant) variant(e.variant).phase = e.phase;
     else if (e.kind === "verdict" && e.variant) {
       Object.assign(variant(e.variant), { verdict: e.verdict, bootS: e.boot_s, fault: e.fault, gsm8k: e.gsm8k, phase: "done" });
