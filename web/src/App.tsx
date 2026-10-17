@@ -2,8 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { GpuRun } from "../../server/gpu";
 import { score } from "../../server/score";
 import { getState, startRun, type AppState, type TimelineEvent, type TriageStatus } from "./api";
-import { Bar } from "./Bar";
-import { IssueList } from "./IssueList";
+import { Dots } from "./Dots";
 import { PostDialog } from "./PostDialog";
 import { Stage } from "./Stage";
 
@@ -41,7 +40,34 @@ const clock = (ms: number) => {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 };
 
+function useTheme() {
+  useEffect(() => {
+    const forced = new URLSearchParams(location.search).get("theme");
+    let theme = forced ?? (() => {
+      try {
+        return localStorage.getItem("theme") ?? "light";
+      } catch {
+        return "light";
+      }
+    })();
+    document.documentElement.dataset.theme = theme;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "t" || e.metaKey || e.ctrlKey || (e.target as HTMLElement).closest("input, textarea, pine-desktop")) return;
+      theme = theme === "dark" ? "light" : "dark";
+      document.documentElement.dataset.theme = theme;
+      try {
+        localStorage.setItem("theme", theme);
+      } catch {
+        // private window: the switch still works for this visit
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+}
+
 export function App() {
+  useTheme();
   const [state, setState] = useState<AppState>();
   const [runId, setRunId] = useState<string>();
   const [selected, setSelected] = useState<string>();
@@ -123,7 +149,6 @@ export function App() {
         </div>
       </header>
 
-      <Bar statuses={state.statuses} total={issues.length} />
       {error && (
         <p className="error" role="alert">
           {error}{" "}
@@ -133,26 +158,24 @@ export function App() {
         </p>
       )}
 
-      <main className="floor">
-        <IssueList issues={issues} byKey={byKey} selected={focusKey} onSelect={setSelected} />
-        {focus && run ? (
-          <Stage
-            issue={focus}
-            status={byKey.get(focus.key)}
-            runId={run.runId}
-            live={liveEvents[`${run.runId}/${focus.key}`] ?? []}
-            gpu={gpu.find((g) => g.issueKey === focus.key && g.kitReady)}
-            reviewed={state.reviewed?.[focus.key]}
-            onPost={(draft) => setPosting({ url: focus.url, draft })}
-          />
-        ) : (
-          <p className="screen__empty">Run the agents to give every issue its own Pine Computer.</p>
-        )}
-      </main>
+      {focus && run ? (
+        <Stage
+          issue={focus}
+          status={byKey.get(focus.key)}
+          runId={run.runId}
+          live={liveEvents[`${run.runId}/${focus.key}`] ?? []}
+          gpu={gpu.find((g) => g.issueKey === focus.key && g.kitReady)}
+          reviewed={state.reviewed?.[focus.key]}
+          onPost={(draft) => setPosting({ url: focus.url, draft })}
+        />
+      ) : (
+        <p className="screen__empty">Run the agents to give every issue its own Pine Computer.</p>
+      )}
 
       <footer className="foot">
-        <button className="link" onClick={() => setPosting({ url: "https://github.com/login", draft: "" })}>
-          My GitHub desktop
+        <Dots issues={issues} byKey={byKey} selected={focusKey} onSelect={setSelected} />
+        <button className="link foot__link" onClick={() => setPosting({ url: "https://github.com/login", draft: "" })}>
+          GitHub desktop
         </button>
       </footer>
 

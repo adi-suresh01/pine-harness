@@ -55,20 +55,24 @@ export function Stage({ issue, status, runId, live, gpu, reviewed, onPost }: Pro
         )}
       </div>
 
-      <p className="now">
-        {running && lastStep ? (
-          <>
-            <span className="dot is-working" aria-hidden /> {lastStep}
-          </>
-        ) : done ? (
-          `Finished in ${duration(status)}${status.costUsd ? `, $${status.costUsd.toFixed(2)} of agent time` : ""}`
-        ) : status?.phase === "failed" ? (
-          `No verdict: ${status.error ?? "the agent stopped early"}`
-        ) : (
-          <a href={issue.url} target="_blank" rel="noreferrer">
-            {issue.repo}#{issue.number}
-          </a>
-        )}
+      <p className="caption">
+        <a className="caption__ref" href={issue.url} target="_blank" rel="noreferrer">
+          {issue.repo.startsWith("vllm") ? "vLLM" : "SGLang"} #{issue.number}
+        </a>
+        <span className="caption__title">{issue.title.replace(/^\[[^\]]+\]:?\s*/, "")}</span>
+        <span className="caption__now">
+          {running && lastStep ? (
+            <>
+              <span className="pulse" aria-hidden /> {lastStep}
+            </>
+          ) : done ? (
+            `${duration(status)}${status.costUsd ? `, $${status.costUsd.toFixed(2)}` : ""}`
+          ) : status?.phase === "failed" ? (
+            "no verdict"
+          ) : (
+            ""
+          )}
+        </span>
       </p>
       </div>
 
@@ -94,10 +98,7 @@ export function Stage({ issue, status, runId, live, gpu, reviewed, onPost }: Pro
             <button className="link" aria-expanded={open === "evidence"} onClick={() => setOpen(open === "evidence" ? null : "evidence")}>
               Evidence
             </button>
-            <a className="link" href={issue.url} target="_blank" rel="noreferrer">
-              Open on GitHub
-            </a>
-          </p>
+            </p>
           {open === "comment" && <Prose text={draft} />}
           {open === "evidence" && (
             <ul className="evidence">
@@ -111,6 +112,12 @@ export function Stage({ issue, status, runId, live, gpu, reviewed, onPost }: Pro
               ))}
             </ul>
           )}
+        </div>
+      )}
+      {!done && (
+        <div className="verdict verdict--pending">
+          <h2>{status?.phase === "failed" ? "No verdict" : status ? "Reading the thread" : "Waiting to start"}</h2>
+          <p className="verdict__meta">{status?.phase === "failed" ? status.error : "The verdict lands here, with every link it cites checked against GitHub."}</p>
         </div>
       )}
     </section>
