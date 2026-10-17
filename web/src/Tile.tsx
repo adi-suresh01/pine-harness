@@ -1,4 +1,4 @@
-import { CATEGORY_LABEL, finalCategory, frameUrl, type Issue, type TriageStatus } from "./api";
+import { CATEGORY_LABEL, finalCategory, frameUrl, type Category, type Issue, type TriageStatus } from "./api";
 
 const PHASE_TEXT: Record<string, string> = {
   queued: "Waiting for its Computer",
@@ -6,6 +6,15 @@ const PHASE_TEXT: Record<string, string> = {
   running: "Reading the thread",
   verifying: "Checking the evidence",
   failed: "No verdict",
+};
+
+// tiles are narrow; the verdict card and the sorting bar carry the full names
+const TILE_LABEL: Record<Category, string> = {
+  already_fixed: "Already fixed",
+  needs_repro: "GPU repro",
+  needs_info: "Needs info",
+  duplicate: "Duplicate",
+  not_a_bug: "Not a bug",
 };
 
 interface Props {
@@ -30,6 +39,14 @@ export function Tile({ issue, status, runId, selected, onSelect }: Props) {
         ) : (
           <span className="tile__idle">{status ? PHASE_TEXT[status.phase] ?? "" : "Not started"}</span>
         )}
+        {judged && (
+          <span
+            className={`tile__gt ${gt.category === cat ? "is-same" : "is-diff"}`}
+            title={gt.category === cat ? "Matches my hand triage" : `My hand triage said ${CATEGORY_LABEL[gt.category].toLowerCase()}`}
+          >
+            {gt.category === cat ? "Matches me" : "Differs"}
+          </span>
+        )}
       </div>
       <div className="tile__body">
         <span className="tile__ref">
@@ -37,10 +54,7 @@ export function Tile({ issue, status, runId, selected, onSelect }: Props) {
         </span>
         <span className="tile__title">{issue.title.replace(/^\[[^\]]+\]:?\s*/, "")}</span>
       </div>
-      <div className="tile__foot">
-        {cat ? CATEGORY_LABEL[cat] : status ? PHASE_TEXT[status.phase] : ""}
-        {judged && <span className="tile__gt">{gt.category === cat ? "matches my call" : "differs from my call"}</span>}
-      </div>
+      <div className="tile__foot">{cat ? TILE_LABEL[cat] : status ? PHASE_TEXT[status.phase] : ""}</div>
     </button>
   );
 }

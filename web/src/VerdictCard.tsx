@@ -20,10 +20,19 @@ export function VerdictCard({ issue, status, reviewed, onPost }: Props) {
   const v = status.verdict;
   const ver = status.verified;
   const cat = ver?.categoryOut ?? v.category;
+  const draft = reviewed ?? v.draft_comment;
 
   return (
     <section className={`verdict cat-${cat}`} aria-label="Verdict">
-      <h2 className="verdict__cat">{CATEGORY_LABEL[cat]}</h2>
+      <header className="verdict__head">
+        <h2 className="verdict__cat">{CATEGORY_LABEL[cat]}</h2>
+        {/* up here so it stays on screen however long the evidence list gets */}
+        {draft && (
+          <button className="btn" onClick={() => onPost(draft)}>
+            Review and post
+          </button>
+        )}
+      </header>
       <p className="verdict__meta">
         {v.confidence} confidence
         {ver?.downgraded && `, moved from ${CATEGORY_LABEL[ver.categoryIn].toLowerCase()} because ${ver.note}`}
@@ -46,13 +55,10 @@ export function VerdictCard({ issue, status, reviewed, onPost }: Props) {
           ))}
         </ul>
       )}
-      {(reviewed || v.draft_comment) && (
+      {draft && (
         <div className="draft">
           <p className="draft__label">{reviewed ? "My reviewed comment, with the GPU results" : "The agent's draft comment"}</p>
-          <p className="draft__text">{reviewed ?? v.draft_comment}</p>
-          <button className="btn" onClick={() => onPost(reviewed ?? v.draft_comment)}>
-            Review and post
-          </button>
+          <p className="draft__text">{draft}</p>
         </div>
       )}
     </section>

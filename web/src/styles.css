@@ -18,7 +18,7 @@
   --step-1: 1.125rem;
   --step-2: 1.5rem;
   --step-3: 2.25rem;
-  --gap: 14px;
+  --gap: 12px;
   --radius-tile: 6px;
 }
 
@@ -41,7 +41,6 @@ body {
   font-family: var(--font);
   font-size: var(--step-0);
   line-height: 1.45;
-  font-variant-numeric: tabular-nums;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -97,8 +96,8 @@ body {
   display: grid;
   grid-template-rows: auto auto auto 1fr;
   height: 100%;
-  padding: 18px 22px 22px;
-  gap: 14px;
+  padding: 16px 22px 18px;
+  gap: 10px;
 }
 
 /* header */
@@ -130,6 +129,7 @@ body {
 .top__clock {
   font-size: var(--step-2);
   font-weight: 700;
+  font-variant-numeric: tabular-nums;
 }
 .top__score {
   font-weight: 650;
@@ -183,6 +183,7 @@ body {
   font-weight: 600;
 }
 .sortbar__n {
+  font-variant-numeric: tabular-nums;
   font-weight: 800;
   font-size: var(--step-2);
   margin-right: 2px;
@@ -200,15 +201,17 @@ body {
 }
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(136px, 1fr));
   gap: var(--gap);
   align-content: start;
+  /* rows keep the tiles' full height: a clipped tile has no minimum size and the grid would squash it */
+  grid-auto-rows: max-content;
   overflow: auto;
   padding: 2px;
 }
 .side {
   display: grid;
-  grid-template-rows: minmax(0, 1.2fr) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 0.95fr) minmax(0, 1.25fr);
   gap: 14px;
   min-height: 0;
 }
@@ -217,8 +220,9 @@ body {
   font: inherit;
   color: inherit;
   text-align: left;
-  display: grid;
-  grid-template-rows: auto 1fr auto;
+  /* block layout on purpose: a <button> laid out as a grid sizes its rows unreliably */
+  display: block;
+  width: 100%;
   background: var(--panel);
   border: 1px solid var(--rule);
   border-radius: var(--radius-tile);
@@ -229,29 +233,44 @@ body {
 .tile--selected {
   box-shadow: 0 0 0 3px var(--ink);
 }
+/* the screenshot is pinned inside a fixed 16:10 frame: an aspect-ratio box with an in-flow image grows to the
+   image's own height and pushes the frame's text on top of it */
 .tile__screen {
-  aspect-ratio: 16 / 10;
+  display: block;
+  position: relative;
+  /* a wide strip of the agent's screen, so all 19 tiles fit at 1080p without scrolling */
+  aspect-ratio: 12 / 5;
+  min-height: 0;
   background: #dde2dc;
-  display: grid;
-  place-items: center;
   overflow: hidden;
 }
 .tile__screen img {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
   object-position: top left;
 }
 .tile__idle {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
   color: var(--ink-soft);
   font-size: var(--step--1);
   padding: 0 10px;
   text-align: center;
 }
 .tile__body {
-  padding: 8px 10px 6px;
-  display: grid;
-  gap: 2px;
+  display: block;
+  padding: 6px 10px 4px;
+}
+.tile__ref {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .tile__ref {
   font-weight: 750;
@@ -260,28 +279,43 @@ body {
   font-size: var(--step--1);
   color: var(--ink-soft);
   display: -webkit-box;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 1;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
 .tile__foot {
+  display: block;
   padding: 6px 10px;
   font-size: var(--step--1);
   font-weight: 650;
   color: var(--ink-soft);
   border-top: 1px solid var(--rule);
-  display: flex;
-  justify-content: space-between;
-  gap: 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .tile--sorted .tile__foot {
   background: var(--cat);
   color: #fff;
   border-top-color: var(--cat);
 }
+/* my hand triage, as a label on the screenshot so the footer keeps one line */
 .tile__gt {
-  font-weight: 500;
-  opacity: 0.9;
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 650;
+  white-space: nowrap;
+  background: var(--ink);
+  color: var(--panel);
+}
+.tile__gt.is-diff {
+  background: var(--panel);
+  color: var(--ink);
+  box-shadow: inset 0 0 0 2px var(--ink);
 }
 @media (prefers-reduced-motion: no-preference) {
   .tile--sorted .tile__foot {
@@ -304,6 +338,7 @@ body {
   border-radius: 10px;
   padding: 12px;
   min-height: 0;
+  overflow: hidden;
 }
 .focus__head {
   display: flex;
@@ -319,7 +354,7 @@ body {
   position: relative;
   width: 100%;
   height: 100%;
-  min-height: 200px;
+  min-height: 0;
   background: #1f2a25;
   border-radius: 6px;
   overflow: hidden;
@@ -346,7 +381,7 @@ body {
   list-style: none;
   margin: 0;
   padding: 0;
-  max-height: 9.5em;
+  max-height: 6.8em;
   overflow: auto;
   font-size: var(--step--1);
   display: grid;
@@ -393,6 +428,12 @@ body {
   display: grid;
   place-items: center;
   text-align: center;
+}
+.verdict__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
 }
 .verdict__cat {
   margin: 0;
@@ -474,9 +515,9 @@ body {
   border: 1px solid var(--rule);
   border-left: 8px solid var(--cat-needs_repro);
   border-radius: 10px;
-  padding: 10px 14px;
+  padding: 8px 14px 10px;
   display: grid;
-  gap: 8px;
+  gap: 4px;
 }
 .gpu__title {
   margin: 0;
