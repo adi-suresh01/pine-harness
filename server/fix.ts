@@ -25,6 +25,10 @@ const TARGETS: Record<string, Target> = {
 };
 
 export interface FixStatus {
+  /** PR pages the agent opened despite the brief, so the page can say so */
+  openedPrs?: string[];
+  /** an open PR whose change this patch repeats line for line */
+  sameAs?: string;
   fixId: string;
   issueKey: string;
   slot: number;
@@ -60,8 +64,10 @@ The attached ${file} is \`${t.path}\` from vLLM ${t.ref}, the exact version the 
 
 ## Steps
 
-1. Read the issue in the browser, including the error and any proposed fix in the thread.
-2. Find the code path the traceback names in ${file}.
+1. Read the issue in the browser: the body and the error. Do not open the pull requests linked from it or search for
+   other fixes: this run measures whether you can write the fix yourself from the report and the source. Work from
+   the traceback, the numbers in the error and ${file}.
+2. Find the code path the traceback names in ${file}, and work out why it needs more shared memory than the GPU has.
 3. Make the smallest change that removes the failure on GPUs with a small shared-memory limit (sm_86, sm_89, sm_120,
    101,376 bytes per block) and keeps today's behavior on GPUs with more (Hopper, datacenter Blackwell). Keep the
    file's style. No new dependencies, no unrelated edits.
@@ -144,6 +150,9 @@ async function runFix(s: FixStatus, issueUrl: string, title: string, t: Target) 
 
   const problem = await checkPatch(patch, t, source);
   if (problem) throw new Error(problem);
+  const openedPrs = await prsOpened(dir);
+  const sameAs = await matchingPr(patch, STAGE_KITS[s.issueKey]!);
+  await update(s, { openedPrs, sameAs });
   await writeFile(join(KIT, "issues", STAGE_KITS[s.issueKey]!, "patches", "agent-fix.diff"), patch);
   await update(s, { phase: "done", patch, endedAt: new Date().toISOString() });
 }
@@ -163,4 +172,32 @@ export async function checkPatch(patch: string, t: Target, source: string): Prom
   } finally {
     await rm(root, { recursive: true, force: true });
   }
+}
+
+// the changed lines only, so timestamps and hunk offsets don't hide a copy
+function changedLines(patch: string): string {
+  return patch
+    .split("\n")
+    .filter((l) => /^[+-]/.test(l) && !/^(\+\+\+|---) /.test(l))
+    .map((l) => l.trimEnd())
+    .join("\n");
+}
+
+async function matchingPr(patch: string, kit: string): Promise<string | undefined> {
+  const mine = changedLines(patch);
+  const known: Record<string, string> = { "pr60173-smem-guard": "#60173", "pr54013-fp8-mla-stages": "#54013", "pr61068-oor-fallback": "#61068" };
+  for (const [file, pr] of Object.entries(known)) {
+    for (const k of [kit, kit.replace(/-stage$/, "")]) {
+      const f = Bun.file(join(KIT, "issues", k, "patches", `${file}.diff`));
+      if ((await f.exists()) && changedLines(await f.text()) === mine) return pr;
+    }
+  }
+  return undefined;
+}
+
+async function prsOpened(dir: string): Promise<string[]> {
+  const text = await Bun.file(join(dir, "events.jsonl")).text().catch(() => "");
+  const prs = new Set<string>();
+  for (const m of text.matchAll(/github\.com\/[\w.-]+\/[\w.-]+\/pull\/(\d+)/g)) prs.add(`#${m[1]}`);
+  return [...prs];
 }

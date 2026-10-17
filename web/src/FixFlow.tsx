@@ -62,7 +62,13 @@ export function FixFlow({ issueKey, fix, stage }: Props) {
 
   return (
     <div className="fix">
-      {mine.summary && <p className="fix__summary">{mine.summary.split(/(?<=\.)\s/)[0]}</p>}
+      {mine.summary && <p className="fix__summary">{mine.summary.replace(/^Created \[?agent-fix\.diff\]?(\([^)]*\))?\.?\s*/, "").split(/(?<=\.)\s/)[0]}</p>}
+      {(mine.sameAs || mine.openedPrs?.length) && (
+        <p className="fix__note">
+          {mine.sameAs ? `Same change as open PR ${mine.sameAs}.` : ""}
+          {mine.openedPrs?.length ? ` It opened ${mine.openedPrs.join(", ")} while working.` : ""}
+        </p>
+      )}
       <Diff text={mine.patch ?? ""} />
       {done ? (
         <ul className="fix__results">

@@ -294,6 +294,11 @@ a {
 .fix__summary {
   margin: 0;
 }
+.fix__note {
+  margin: 0;
+  color: var(--soft);
+  font-size: var(--s-13);
+}
 .fix__error {
   margin: 0;
   color: var(--cat-needs_repro);
