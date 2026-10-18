@@ -1,5 +1,25 @@
 # Submission description
 
+## Discord version (under 2,000 characters)
+
+```
+**pine-harness**: Pine Computer agents triage open Blackwell (sm_120) serving bugs in vLLM and SGLang.
+
+**What it does**
+Most of my time fixing these bugs goes into triage, not GPUs. So each of 19 open issues gets its own Pine Computer. The agent reads the thread in a real Chrome, digs through vLLM, SGLang and FlashInfer PRs and releases, and returns a verdict with evidence and a draft comment. My server checks every cited link against GitHub before it shows (489 of 489 held up). Issues that need a GPU go to my sm120-kit harness: for vllm#60172 an agent wrote its own patch, and a real RTX PRO 6000 showed unpatched fails at boot, patched serves. Agents never post; I click Comment myself.
+
+**How I used Pine**
+- One Pine Computer per issue, 19 at once, fresh session per run
+- agent.run for triage and the fix, attachments for the brief and vLLM source, secrets for the GitHub token
+- Event stream + Web SDK for the live desktop on the page
+- Artifacts for verdict.json and the patch
+- Take control + persistent identity: a signed-in Computer I post from by hand
+- Learned skill, reviewed before use (that review caught a duplicate bias)
+
+19 issues in ~4 min, ~8 cents an issue.
+https://github.com/adi-suresh01/pine-harness
+```
+
 ## What it does
 
 This week I was fixing GPU serving bugs in vLLM and SGLang on RTX PRO 6000 (Blackwell, sm_120), and most of the time
